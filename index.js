@@ -64,9 +64,10 @@ const main = async (opts) => {
 
   // write back to COS
   console.log('writing finished video to cos')
+  const outputKey = path.join(choirId, songId, 'final') + '.mp4'
   await cos.putObject({
     Bucket: opts.COS_BUCKET,
-    Key: path.join(choirId, songId, 'final') + '.mp4',
+    Key: outputKey,
     Body: fs.createReadStream(filename)
   }).promise()
   console.log('done')
@@ -77,7 +78,7 @@ const main = async (opts) => {
     fs.unlinkSync(localVideos[i])
   }
 
-  return { ok: true }
+  return { ok: true, key: outputKey }
 }
 
 module.exports = {

@@ -63,3 +63,9 @@ The final video is stored as
 ```
 <choirId>/<songId>/final.mp4
 ```
+
+## Building Docker image
+
+```sh
+docker build -t glynnbird/choirless_renderer .
+```

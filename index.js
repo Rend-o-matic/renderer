@@ -80,7 +80,3 @@ const main = async (opts) => {
 
   return { ok: true, key: outputKey }
 }
-
-module.exports = {
-  main
-}

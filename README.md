@@ -67,5 +67,18 @@ The final video is stored as
 ## Building Docker image
 
 ```sh
+# create a docker image, based on the standard OpenWhisk image but with our 
+# node_modules added
 docker build -t glynnbird/choirless_renderer .
+# tag it
+docker tag glynnbird/choirless_renderer:latest glynnbird/choirless_renderer:0.0.3
+
+# push it to DockerHub
+docker push glynnbird/choirless_renderer:0.0.3
+# create an IBM Cloud Function using our index.js but with our custom Docker image
+ibmcloud fn action update choirless_renderer --docker glynnbird/choirless_renderer:0.0.3 index.js
+
+# invoke
+ibmcloud fn action invoke choirless_renderer --result 
+# ^ will fail as no parameters supplied
 ```

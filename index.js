@@ -1,4 +1,4 @@
-const sticheroo = require('stitcheroo')
+const stitcheroo = require('stitcheroo')
 const fs = require('fs')
 const os = require('os')
 const path = require('path')
@@ -59,7 +59,7 @@ const main = async (opts) => {
   console.log('local video files', localVideos)
 
   // render the videos to a single video
-  const filename = await sticheroo(localVideos, false)
+  const filename = await stitcheroo(localVideos, false)
   console.log('finished video', filename)
 
   // write back to COS
@@ -79,4 +79,8 @@ const main = async (opts) => {
   }
 
   return { ok: true, key: outputKey }
+}
+
+module.exports = {
+  main
 }

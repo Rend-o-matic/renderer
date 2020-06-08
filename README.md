@@ -82,3 +82,34 @@ ibmcloud fn action update choirless_renderer --docker glynnbird/choirless_render
 ibmcloud fn action invoke choirless_renderer --result 
 # ^ will fail as no parameters supplied
 ```
+
+## Deploying
+
+Create a config file `config.json` with the following form:
+
+```js
+{
+  "COS_API_KEY": "...",
+  "COS_ENDPOINT": "...",
+  "COS_INSTANCE_ID": "...",
+  "COS_BUCKET": "choirless",
+  "COUCH_URL": "...",
+  "COUCH_USERS_DATABASE": "choirless_users",
+  "COUCH_CHOIRLESS_DATABASE": "choirless",
+  "COUCH_KEYS_DATABASE": "choirless_keys",
+  "COUCH_QUEUE_DATABASE": "choirless_queue"
+}
+```
+
+> Note: see the parameters section for which values to put in the config file.
+
+```sh
+# create a package with the config rolled into it
+ibmcloud fn package update choirless -P config.json
+
+# add renderer action into this package with non-default memory size and execution limit
+ibmcloud fn action update choirless/renderer --docker glynnbird/choirless_renderer:0.0.3 index.js --memory 2048 -t 180000
+
+# test invocation for known choirId/songId
+ibmcloud fn action invoke choirless_renderer --result --param choirId "001jZ8zh3NPbQ71ZmcEx3BDvTX1n3mgO" --param songId "001jZ9O31N91NT0bEukk49qjL62D9vWT"
+```

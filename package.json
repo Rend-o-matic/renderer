@@ -26,7 +26,7 @@
   "dependencies": {
     "choirlessapi": "Choirless/choirlessapi",
     "ibm-cos-sdk": "^1.6.1",
-    "stitcheroo": "0.0.26"
+    "stitcheroo": "^1.0.0"
   },
   "devDependencies": {
     "standard": "^14.3.4"

@@ -59,7 +59,7 @@ const main = async (opts) => {
   console.log('local video files', localVideos)
 
   // render the videos to a single video
-  const filename = await stitcheroo(localVideos, false)
+  const filename = await stitcheroo(localVideos, { returnAsFile: true })
   console.log('finished video', filename)
 
   // write back to COS

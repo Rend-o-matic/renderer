@@ -71,12 +71,12 @@ The final video is stored as
 # node_modules added
 docker build -t glynnbird/choirless_renderer .
 # tag it
-docker tag glynnbird/choirless_renderer:latest glynnbird/choirless_renderer:0.0.3
+docker tag glynnbird/choirless_renderer:latest glynnbird/choirless_renderer:1.0.1
 
 # push it to DockerHub
-docker push glynnbird/choirless_renderer:0.0.3
+docker push glynnbird/choirless_renderer:1.0.1
 # create an IBM Cloud Function using our index.js but with our custom Docker image
-ibmcloud fn action update choirless_renderer --docker glynnbird/choirless_renderer:0.0.3 index.js
+ibmcloud fn action update choirless_renderer --docker glynnbird/choirless_renderer:1.0.1 index.js
 
 # invoke
 ibmcloud fn action invoke choirless_renderer --result 
@@ -108,7 +108,7 @@ Create a config file `config.json` with the following form:
 ibmcloud fn package update choirless -P config.json
 
 # add renderer action into this package with non-default memory size and execution limit
-ibmcloud fn action update choirless/renderer --docker glynnbird/choirless_renderer:0.0.3 index.js --memory 2048 -t 180000
+ibmcloud fn action update choirless/renderer --docker glynnbird/choirless_renderer:1.0.1 index.js --memory 2048 -t 600000
 
 # test invocation for known choirId/songId
 ibmcloud fn action invoke choirless_renderer --result --param choirId "001jZ8zh3NPbQ71ZmcEx3BDvTX1n3mgO" --param songId "001jZ9O31N91NT0bEukk49qjL62D9vWT"

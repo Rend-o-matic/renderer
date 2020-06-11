@@ -1,6 +1,6 @@
 {
   "name": "renderer",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Choirless render farm",
   "main": "index.js",
   "scripts": {
@@ -26,7 +26,7 @@
   "dependencies": {
     "choirlessapi": "Choirless/choirlessapi",
     "ibm-cos-sdk": "^1.6.1",
-    "stitcheroo": "^1.0.0"
+    "stitcheroo": "^1.1.0"
   },
   "devDependencies": {
     "standard": "^14.3.4"

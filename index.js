@@ -1,19 +1,5 @@
-const stitcheroo = require('stitcheroo')
-const fs = require('fs')
-const os = require('os')
 const path = require('path')
-const ibmCOS = require('ibm-cos-sdk')
-
-// read a COS object to a local file using streams
-const pullFromCOS = async (cos, params, localFilename) => {
-  console.log('pullFromCOS', params, '--->', localFilename)
-  return new Promise((resolve, reject) => {
-    const ws = fs.createWriteStream(localFilename)
-    cos.getObject(params).createReadStream().pipe(ws)
-      .on('close', resolve)
-      .on('error', reject)
-  })
-}
+const openwhisk = require('openwhisk')
 
 const main = async (opts) => {
   // put incoming opts into environment variables for choirlessapi
@@ -27,16 +13,8 @@ const main = async (opts) => {
   const songId = opts.songId
   const choirId = opts.choirId
   if (!songId || !choirId) {
-    return { ok: false, message: 'missing parameterss' }
+    return { ok: false, message: 'missing parameters' }
   }
-
-  // configure COS
-  const config = {
-    endpoint: opts.COS_ENDPOINT,
-    apiKeyId: opts.COS_API_KEY,
-    serviceInstanceId: opts.COS_INSTANCE_ID
-  }
-  const cos = new ibmCOS.S3(config)
 
   // get the song parts from the database
   const response = await choirlessAPI.getChoirSongParts({ songId: songId, choirId: choirId })
@@ -46,39 +24,30 @@ const main = async (opts) => {
   const videos = response.parts.map((p) => {
     return path.join(p.choirId, p.songId, p.partId) + '.mp4'
   })
+  const outputKey = path.join(choirId, songId, 'final') + '.mp4'
   console.log('COS keys', videos)
 
-  // fetch the song parts' mp4 files from COS
-  const tmp = os.tmpdir()
-  const localVideos = []
-  for (var i in videos) {
-    const localFilename = path.join(tmp, i + '.mp4')
-    await pullFromCOS(cos, { Bucket: opts.COS_BUCKET, Key: videos[i] }, localFilename)
-    localVideos.push(localFilename)
+  // call the sticher service
+  const ow = openwhisk()
+  const params = {
+    videos: videos,
+    width: 720,
+    height: 390,
+    center: true,
+    pan: true,
+    margin: 20,
+    reverbType: 'hall',
+    reverbMix: 0.1,
+    outputKey: outputKey
   }
-  console.log('local video files', localVideos)
-
-  // render the videos to a single video
-  const filename = await stitcheroo(localVideos, { returnAsFile: true })
-  console.log('finished video', filename)
-
-  // write back to COS
-  console.log('writing finished video to cos')
-  const outputKey = path.join(choirId, songId, 'final') + '.mp4'
-  await cos.putObject({
-    Bucket: opts.COS_BUCKET,
-    Key: outputKey,
-    Body: fs.createReadStream(filename)
-  }).promise()
-  console.log('done')
-
-  // clean up temp files
-  fs.unlinkSync(filename)
-  for (i in localVideos) {
-    fs.unlinkSync(localVideos[i])
+  console.log(params)
+  try {
+    const invocation = await ow.actions.invoke({ name: 'choirless/stitcher', params: params })
+    return { ok: true, key: invocation }
+  } catch (e) {
+    console.error(e)
+    return { ok: false }
   }
-
-  return { ok: true, key: outputKey }
 }
 
 module.exports = {

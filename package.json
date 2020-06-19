@@ -24,9 +24,7 @@
   },
   "homepage": "https://github.com/Choirless/renderer#readme",
   "dependencies": {
-    "choirlessapi": "Choirless/choirlessapi",
-    "ibm-cos-sdk": "^1.6.1",
-    "stitcheroo": "^1.1.0"
+    "openwhisk": "^3.21.2"
   },
   "devDependencies": {
     "standard": "^14.3.4"

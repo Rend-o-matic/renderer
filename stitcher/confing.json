@@ -1,0 +1,6 @@
+{
+    "COS_API_KEY": "...",
+    "COS_ENDPOINT": "...",
+    "COS_INSTANCE_ID": "...",
+    "COS_BUCKET": "choirless"
+}

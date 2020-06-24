@@ -1,0 +1,34 @@
+{
+  "name": "stitcher",
+  "version": "1.0.0",
+  "description": "Choirless serverless sticheroo service",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "standard": "standard --fix"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Choirless/stitcher.git"
+  },
+  "keywords": [
+    "Choirless",
+    "ffmpeg",
+    "video",
+    "render"
+  ],
+  "author": "Glynn Bird <glynn.bird@gmail.com>",
+  "license": "Apache-2.0",
+  "bugs": {
+    "url": "https://github.com/Choirless/stitcher/issues"
+  },
+  "homepage": "https://github.com/Choirless/stitcher#readme",
+  "dependencies": {
+    "choirlessapi": "Choirless/choirlessapi",
+    "ibm-cos-sdk": "^1.6.1",
+    "stitcheroo": "^1.1.0"
+  },
+  "devDependencies": {
+    "standard": "^14.3.4"
+  }
+}

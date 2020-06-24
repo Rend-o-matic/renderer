@@ -33,33 +33,36 @@ cos-auth:
 
 # Create the package
 package:
-	ibmcloud fn package create audio_alignment
+	ibmcloud fn package create choirless
 	# Bind COS instance to the package
-	ibmcloud fn service bind cloud-object-storage audio_alignment --instance $(COS_INSTANCE_NAME)
+	ibmcloud fn service bind cloud-object-storage choirless --instance $(COS_INSTANCE_NAME)
 
 # Actions
 actions:
 	# Convert format
-	ibmcloud fn action update audio_alignment/convert_format convert_format.py --param src_bucket $(RAW_BUCKET_NAME) --param dst_bucket $(CONVERTED_BUCKET_NAME) \
+	ibmcloud fn action update choirless/convert_format aligner/convert_format.py --param src_bucket $(RAW_BUCKET_NAME) --param dst_bucket $(CONVERTED_BUCKET_NAME) \
 	 --docker hammertoe/librosa_ml:latest --timeout 600000 --memory 512
 
 	# Calculate alignment
-	ibmcloud fn action update audio_alignment/calculate_alignment calculate_alignment.py --param bucket $(CONVERTED_BUCKET_NAME) \
+	ibmcloud fn action update choirless/calculate_alignment aligner/calculate_alignment.py --param bucket $(CONVERTED_BUCKET_NAME) \
 	 --docker hammertoe/librosa_ml:latest --timeout 600000 --memory 512
 
 	# Trim clip
-	ibmcloud fn action update audio_alignment/trim_clip trim_clip.py --param src_bucket $(CONVERTED_BUCKET_NAME) --param dst_bucket $(TRIMMED_BUCKET_NAME)  \
+	ibmcloud fn action update choirless/trim_clip aligner/trim_clip.py --param src_bucket $(CONVERTED_BUCKET_NAME) --param dst_bucket $(TRIMMED_BUCKET_NAME)  \
 	 --docker hammertoe/librosa_ml:latest --timeout 600000 --memory 512
 
 	# Pass to sticher
-	ibmcloud fn action update audio_alignment/pass_to_sticher pass_to_sticher.py --param bucket $(TRIMMED_BUCKET_NAME) \
+	ibmcloud fn action update choirless/pass_to_sticher aligner/pass_to_sticher.py --param bucket $(TRIMMED_BUCKET_NAME) \
 	 --docker hammertoe/librosa_ml:latest --timeout 600000 --memory 512
 
+	# Sticher
+	ibmcloud fn action update choirless/stitcher stitcher/index.js \
+         --docker glynnbird/choirless_stitcher:1.0.0 --memory 2048 -t 600000
 
 sequences:
 	# Calc alignment and Trim amd stitch
-	ibmcloud fn action update audio_alignment/calc_and_trim --sequence audio_alignment/calculate_alignment,audio_alignment/trim_clip
-	ibmcloud fn action update audio_alignment/stitch --sequence audio_alignment/pass_to_sticher,choirless/stitcher
+	ibmcloud fn action update choirless/calc_and_trim --sequence choirless/calculate_alignment,choirless/trim_clip
+	ibmcloud fn action update choirless/stitch --sequence choirless/pass_to_sticher,choirless/stitcher
 
 triggers:
 	# Upload to raw bucket
@@ -73,13 +76,13 @@ triggers:
 
 rules:
 	# Upload to raw bucket
-	ibmcloud fn rule create bucket_raw_upload_rule bucket_raw_upload_trigger audio_alignment/convert_format
+	ibmcloud fn rule create bucket_raw_upload_rule bucket_raw_upload_trigger choirless/convert_format
 
 	# Upload to converted bucket
-	ibmcloud fn rule create bucket_converted_upload_rule bucket_converted_upload_trigger audio_alignment/calc_and_trim
+	ibmcloud fn rule create bucket_converted_upload_rule bucket_converted_upload_trigger choirless/calc_and_trim
 
 	# Upload to trimmed bucket
-	ibmcloud fn rule create bucket_trimmed_upload_rule bucket_trimmed_upload_trigger audio_alignment/stitch
+	ibmcloud fn rule create bucket_trimmed_upload_rule bucket_trimmed_upload_trigger choirless/stitch
 
 list:
 	# Display entities in the current namespace

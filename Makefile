@@ -59,6 +59,10 @@ actions:
 	ibmcloud fn action update choirless/stitcher stitcher/index.js \
          --docker glynnbird/choirless_stitcher:1.0.0 --memory 2048 -t 600000
 
+	# Renderer
+	ibmcloud fn action update choirless/renderer renderer/index.js \
+	--docker glynnbird/choirless_renderer:1.0.3 --memory 2048 -t 600000
+
 sequences:
 	# Calc alignment and Trim amd stitch
 	ibmcloud fn action update choirless/calc_and_trim --sequence choirless/calculate_alignment,choirless/trim_clip

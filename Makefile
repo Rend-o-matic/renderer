@@ -1,13 +1,23 @@
 # Cloud Object Storage instance name 
 COS_INSTANCE_NAME ?= cloud-object-storage-cb
+COS_REGION ?= eu-gb
 
 # Regional buckets in above Cloud Object Storage instance
 RAW_BUCKET_NAME ?= choirless-videos-raw
 CONVERTED_BUCKET_NAME ?= choirless-videos-converted
 TRIMMED_BUCKET_NAME ?= choirless-videos-trimmed
+FINAL_BUCKET_NAME ?= choirless-videos-final
 
 # Namespace functions will be created int
 NAMESPACE_NAME ?= choirless
+
+# CouchDB config that is passed through to Choirless API
+COUCH_URL ?= "..."
+COUCH_USERS_DATABASE ?= choirless_users
+COUCH_CHOIRLESS_DATABASE ?= choirless
+COUCH_KEYS_DATABASE ?= choirless_keys
+COUCH_QUEUE_DATABASE ?= choirless_queue
+
 
 all: clean build
 
@@ -22,6 +32,13 @@ clean:
 		ic fn namespace delete $${namespace} ; \
 	done
 
+# Create buckets in COS
+create-buckets:
+	ibmcloud cos create-bucket --bucket $(RAW_BUCKET_NAME) --ibm-service-instance-id $(COS_INSTANCE_NAME) --region $(COS_REGION)
+	ibmcloud cos create-bucket --bucket $(CONVERTED_BUCKET_NAME) --ibm-service-instance-id $(COS_INSTANCE_NAME) --region $(COS_REGION)
+	ibmcloud cos create-bucket --bucket $(TRIMMED_BUCKET_NAME) --ibm-service-instance-id $(COS_INSTANCE_NAME) --region $(COS_REGION)
+	ibmcloud cos create-bucket --bucket $(FINAL_BUCKET_NAME) --ibm-service-instance-id $(COS_INSTANCE_NAME) --region $(COS_REGION)
+
 # Create and set namespace
 namespace:
 	ibmcloud fn namespace create $(NAMESPACE_NAME) --description "Choirless video processing service"
@@ -33,7 +50,11 @@ cos-auth:
 
 # Create the package
 package:
-	ibmcloud fn package create choirless
+	ibmcloud fn package create choirless \
+	 --param COUCH_USERS_DATABASE $(COUCH_USERS_DATABASE) \
+	 --param COUCH_CHOIRLESS_DATABASE $(COUCH_CHOIRLESS_DATABASE) \
+	 --param COUCH_KEYS_DATABASE $(COUCH_KEYS_DATABASE) \
+	 --param COUCH_QUEUE_DATABASE $(COUCH_QUEUE_DATABASE)
 	# Bind COS instance to the package
 	ibmcloud fn service bind cloud-object-storage choirless --instance $(COS_INSTANCE_NAME)
 
@@ -60,7 +81,7 @@ actions:
          --docker glynnbird/choirless_stitcher:1.0.0 --memory 2048 -t 600000
 
 	# Renderer
-	ibmcloud fn action update choirless/renderer renderer/index.js \
+	ibmcloud fn action update choirless/renderer renderer/index.js -P renderer/config.json \
 	--docker glynnbird/choirless_renderer:1.0.3 --memory 2048 -t 600000
 
 sequences:

@@ -7,6 +7,8 @@ import re
 import tempfile
 from pathlib import Path
 
+import requests
+
 import ibm_boto3
 from ibm_botocore.client import Config
 
@@ -60,33 +62,46 @@ def main(args):
     if not cos:
         raise ValueError("could not create COS instance")
 
-    key = args['key']
-    mo = re.match(r'^(.*?)\+(.*?)\+(converted)\.(.*?)$', key)
+    rendition_key = args['key']
+    mo = re.match(r'^(.*?)\+(.*?)\+(.*?)\.(.*?)$', rendition_key)
     if not mo:
-        raise ValueError(f"Could not parse key: {key}")
+        raise ValueError(f"Could not parse key: {rendition_key}")
 
-    choir_id, part_key, stage, ext = mo.groups()
+    choir_id, song_id, part_id, ext = mo.groups()
 
-    args['part_key'] = f"{choir_id}+{part_key}+{stage}.{ext}"
-    args['reference_key'] = f"{choir_id}+reference+{stage}.{ext}"
+    # Try and detemine the reference key, first by looking in the bucket
+    # for a specially named partid, or then via the Choirless API
+    reference_key = f"{choir_id}+{song_id}+reference.{ext}"
 
-    if part_key == 'reference':
+    # Abort if we are the reference part
+    if part_id == 'reference':
         args["offset"] = 0
         args["err"] = 0
+        args['rendition_key'] = rendition_key
+        args['reference_key'] = reference_key
         return args
 
-    return manual_main(args)
+    # Ask the API if we have parts for this Song
+    try:
+        api_url = args['CHOIRLESS_API_URL']
+        api_key = args['CHOIRLESS_API_KEY']
 
-def manual_main(args):
+        params = {'apikey': api_key,
+                  'choirId': choir_id,
+                  'songId': song_id,}
+        req = requests.get(f"{api_url}/choir/songparts",
+                           params=params)
+        parts = req.json()['parts']
 
-    cos = createCOSClient(args)
-    bucket = args.get('bucket')
+        # Check each part and look for the reference one
+        for part in parts:
+            if part['partType'] == 'reference':
+                reference_key = f"{part['choirId']}+{part['songId']}+{part['partId']}.mp4"
+    except:
+        print(f"Could not look up part in API: choidId {choir_id} songId {song_id}")
 
-    if not cos:
-        raise ValueError(f"could not create COS instance")
-
-    reference_key = args['reference_key']
-    part_key = args['part_key']
+    args['rendition_key'] = rendition_key
+    args['reference_key'] = reference_key
 
     def load_from_cos(key):
         # Create a temp dir for our files to use
@@ -105,7 +120,7 @@ def manual_main(args):
     x0, fs0 = load_from_cos(reference_key)
 
     # load in sarah
-    x1, fs1 = load_from_cos(part_key)
+    x1, fs1 = load_from_cos(rendition_key)
 
     # Normalise the two signals so that they are the same average
     # amplitude (volume)

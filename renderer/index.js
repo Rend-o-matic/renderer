@@ -22,9 +22,9 @@ const main = async (opts) => {
 
   // calculate the filenames of the videos
   const videos = response.parts.map((p) => {
-    return path.join(p.choirId, p.songId, p.partId) + '.mp4'
+      return [p.choirId, p.songId, p.partId].join('+') + '.mp4'
   })
-  const outputKey = path.join(choirId, songId, 'final') + '.mp4'
+  const outputKey = [choirId, songId, 'final'].join('+') + '.mp4'
   console.log('COS keys', videos)
 
   // call the sticher service

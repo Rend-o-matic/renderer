@@ -18,6 +18,9 @@ COUCH_CHOIRLESS_DATABASE ?= choirless
 COUCH_KEYS_DATABASE ?= choirless_keys
 COUCH_QUEUE_DATABASE ?= choirless_queue
 
+# Choirless API details
+CHOIRLESS_API_URL ?= https://choirless-api.eu-gb.mybluemix.net/
+CHOIRLESS_API_KEY ?= "..."
 
 all: clean build
 
@@ -54,35 +57,44 @@ package:
 	 --param COUCH_USERS_DATABASE $(COUCH_USERS_DATABASE) \
 	 --param COUCH_CHOIRLESS_DATABASE $(COUCH_CHOIRLESS_DATABASE) \
 	 --param COUCH_KEYS_DATABASE $(COUCH_KEYS_DATABASE) \
-	 --param COUCH_QUEUE_DATABASE $(COUCH_QUEUE_DATABASE)
+	 --param COUCH_QUEUE_DATABASE $(COUCH_QUEUE_DATABASE) \
+	 --param CHOIRLESS_API_URL $(CHOIRLESS_API_URL) \
+	 --param CHOIRLESS_API_KEY $(CHOIRLESS_API_KEY)
 	# Bind COS instance to the package
 	ibmcloud fn service bind cloud-object-storage choirless --instance $(COS_INSTANCE_NAME)
 
 # Actions
 actions:
 	# Convert format
-	ibmcloud fn action update choirless/convert_format aligner/convert_format.py --param src_bucket $(RAW_BUCKET_NAME) --param dst_bucket $(CONVERTED_BUCKET_NAME) \
+	ibmcloud fn action update choirless/convert_format aligner/convert_format.py \
+	 --param src_bucket $(RAW_BUCKET_NAME) \
+         --param dst_bucket $(CONVERTED_BUCKET_NAME) \
 	 --docker hammertoe/librosa_ml:latest --timeout 600000 --memory 512
 
 	# Calculate alignment
-	ibmcloud fn action update choirless/calculate_alignment aligner/calculate_alignment.py --param bucket $(CONVERTED_BUCKET_NAME) \
+	ibmcloud fn action update choirless/calculate_alignment aligner/calculate_alignment.py \
+	 --param bucket $(CONVERTED_BUCKET_NAME) \
 	 --docker hammertoe/librosa_ml:latest --timeout 600000 --memory 512
 
 	# Trim clip
-	ibmcloud fn action update choirless/trim_clip aligner/trim_clip.py --param src_bucket $(CONVERTED_BUCKET_NAME) --param dst_bucket $(TRIMMED_BUCKET_NAME)  \
+	ibmcloud fn action update choirless/trim_clip aligner/trim_clip.py \
+	 --param src_bucket $(CONVERTED_BUCKET_NAME) \
+	 --param dst_bucket $(TRIMMED_BUCKET_NAME)  \
 	 --docker hammertoe/librosa_ml:latest --timeout 600000 --memory 512
 
 	# Pass to sticher
-	ibmcloud fn action update choirless/pass_to_sticher aligner/pass_to_sticher.py --param bucket $(TRIMMED_BUCKET_NAME) \
+	ibmcloud fn action update choirless/pass_to_sticher aligner/pass_to_sticher.py \
+	 --param src_bucket $(TRIMMED_BUCKET_NAME) \
+	 --param dst_bucket $(FINAL_BUCKET_NAME) \
 	 --docker hammertoe/librosa_ml:latest --timeout 600000 --memory 512
 
 	# Sticher
 	ibmcloud fn action update choirless/stitcher stitcher/index.js \
-         --docker glynnbird/choirless_stitcher:1.0.0 --memory 2048 -t 600000
+         --docker choirless/choirless_js_actions:latest --memory 2048 -t 600000
 
 	# Renderer
 	ibmcloud fn action update choirless/renderer renderer/index.js -P renderer/config.json \
-	--docker glynnbird/choirless_renderer:1.0.3 --memory 2048 -t 600000
+	 --docker choirless/choirless_js_actions:latest --memory 2048 -t 600000
 
 sequences:
 	# Calc alignment and Trim amd stitch
@@ -91,13 +103,16 @@ sequences:
 
 triggers:
 	# Upload to raw bucket
-	ibmcloud fn trigger create bucket_raw_upload_trigger --feed /whisk.system/cos/changes --param bucket $(RAW_BUCKET_NAME) --param event_types write
+	ibmcloud fn trigger create bucket_raw_upload_trigger --feed /whisk.system/cos/changes \
+	 --param bucket $(RAW_BUCKET_NAME) --param event_types write
 
 	# Upload to converted bucket
-	ibmcloud fn trigger create bucket_converted_upload_trigger --feed /whisk.system/cos/changes --param bucket $(CONVERTED_BUCKET_NAME) --param event_types write
+	ibmcloud fn trigger create bucket_converted_upload_trigger --feed /whisk.system/cos/changes \
+	 --param bucket $(CONVERTED_BUCKET_NAME) --param event_types write
 
-	# Upload to trummed bucket
-	ibmcloud fn trigger create bucket_trimmed_upload_trigger --feed /whisk.system/cos/changes --param bucket $(TRIMMED_BUCKET_NAME) --param event_types write
+	# Upload to trimmed bucket
+	ibmcloud fn trigger create bucket_trimmed_upload_trigger --feed /whisk.system/cos/changes \
+	 --param bucket $(TRIMMED_BUCKET_NAME) --param event_types write
 
 rules:
 	# Upload to raw bucket

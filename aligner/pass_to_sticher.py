@@ -12,35 +12,37 @@ from ibm_botocore.client import Config
 
 def main(args):
 
-    notification = args.get('notification', {})
-    trigger_key = notification.get('object_name', '')
-    # abort if triggered by final video to stop loop
-    if '+final.' in trigger_key:
-        return args
-    
     cos = createCOSClient(args)
 
     if not cos:
         raise ValueError("could not create COS instance")
 
-    bucket = args.get('bucket')
-    key = args.get('key')
-    parts = key.split('+')
+    notification = args.get('notification', {})
+    trigger_key = notification.get('object_name', '')
 
-    choir_key = parts[0]
+    src_bucket = args.get('src_bucket')
+    dst_bucket = args.get('dst_bucket')
+
+    mo = re.match(r'^(.*?)\+(.*?)\+(.*?)\.(.*?)$', trigger_key)
+    if not mo:
+        raise ValueError(f"Could not parse key: {rendition_key}")
+
+    choir_id, song_id, part_id, ext = mo.groups()
+
+    prefix_key = f"{choir_id}+{song_id}"
 
     contents = cos.list_objects(
-        Bucket=bucket,
-        Prefix=choir_key
+        Bucket=src_bucket,
+        Prefix=prefix_key
     )
 
     files = [ x['Key'] for x in contents['Contents'] ]
-    files = [ x for x in files if '+final.' not in x ]
     # stable random sort in order to create more pleasing output
     files.sort(key=lambda x: hashlib.sha1(x.encode('utf-8')).hexdigest())
 
     if len(files) >= 3:
-        args['COS_BUCKET'] = bucket
+        args['COS_SRC_BUCKET'] = src_bucket
+        args['COS_DST_BUCKET'] = dst_bucket
         args['videos'] = files
         args['width'] = 1080
         args['height'] = 720
@@ -49,7 +51,7 @@ def main(args):
         args['pan'] = True
         args['reverbType'] = 'hall'
         args['reverbMix'] = 0.1
-        args['outputKey'] = f'{choir_key}+final.mp4'
+        args['outputKey'] = f'{prefix_key}+final.mp4'
 
         return args
 

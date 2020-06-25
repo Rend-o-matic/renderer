@@ -30,7 +30,7 @@ def main(args):
 
         # download file to temp dir
         file_path = Path(tmpdir, key)
-        new_path = file_path.with_name(f'{file_path.stem}+converted.mp4')
+        new_path = file_path.with_name(f'output-{file_path.stem}.mp4')
 
         cos.download_file(src_bucket, key, str(file_path))
 
@@ -41,7 +41,7 @@ def main(args):
         out = ffmpeg.output(audio, video, str(new_path))
         stdout, stderr = out.run()
 
-        cos.upload_file(str(new_path), dst_bucket, str(new_path.name))
+        cos.upload_file(str(new_path), dst_bucket, f'{file_path.stem}.mp4')
 
         args["src_bucket"] = src_bucket
         args["dst_bucket"] = dst_bucket

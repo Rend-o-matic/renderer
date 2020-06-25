@@ -22,15 +22,15 @@ def main(args):
     src_bucket = args.get('src_bucket')
     dst_bucket = args.get('dst_bucket')
     offset = float(args.get('offset')) / 1000
-    key = args.get('part_key')
+    key = args.get('rendition_key')
 
     # Create a temp dir for our files to use
     with tempfile.TemporaryDirectory() as tmpdir:
 
         # download file to temp dir
         file_path = Path(tmpdir, key)
-        choir_id, part_id, stage = file_path.stem.split('+')
-        new_path = file_path.with_name(f'{file_path.stem}+trimmed.mp4')
+        choir_id, song_id, part_id = file_path.stem.split('+')
+        new_path = file_path.with_name(f'output-{file_path.stem}.mp4')
         cos.download_file(src_bucket, key, str(file_path))
 
         if offset:
@@ -42,14 +42,16 @@ def main(args):
         else:
             new_path = file_path
 
-        cos.upload_file(str(new_path), dst_bucket, str(new_path.name))
+        cos.upload_file(str(new_path), dst_bucket, f'{file_path.stem}.mp4')
 
         args["src_bucket"] = src_bucket
         args["dst_bucket"] = dst_bucket
         args["bucket"] = dst_bucket
         args["src_key"] = key
-        args["dst_key"] = str(new_path.name)
+        args["dst_key"] = f'{file_path.stem}.mp4'
         args["choir_key"] = choir_id
+        args["song_id"] = song_id
+        args["part_id"] = part_id
 
         return args
 

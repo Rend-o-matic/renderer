@@ -28,7 +28,8 @@ const pullFromCOS = async (cos, params, localFilename) => {
 // COS_ENDPOINT - COS endpoint
 // COS_API_KEY - COS API Key
 // COS_INSTANCE_ID - COS service instance id
-// COS_BUCKET - name of COS bucket where files are stored
+// COS_SRC_BUCKET - name of COS bucket where source files are stored
+// COS_DST_BUCKET - name of COS bucket where final render it to be stored
 const main = async (opts) => {
   opts.COS_ENDPOINT = opts.COS_ENDPOINT || opts.endpoint || 'https://s3.us.cloud-object-storage.appdomain.cloud'
   const cosCreds = opts.__bx_creds ? opts.__bx_creds['cloud-object-storage'] : undefined
@@ -57,7 +58,7 @@ const main = async (opts) => {
   const localVideos = []
   for (i in opts.videos) {
     const localFilename = path.join(tmp, i + '.mp4')
-    await pullFromCOS(cos, { Bucket: opts.COS_BUCKET, Key: opts.videos[i] }, localFilename)
+    await pullFromCOS(cos, { Bucket: opts.COS_SRC_BUCKET, Key: opts.videos[i] }, localFilename)
     localVideos.push(localFilename)
   }
   console.log('local video files', localVideos)
@@ -83,7 +84,7 @@ const main = async (opts) => {
   // write back to COS
   console.log('writing finished video to cos')
   await cos.putObject({
-    Bucket: opts.COS_BUCKET,
+    Bucket: opts.COS_DST_BUCKET,
     Key: opts.outputKey,
     Body: fs.createReadStream(filename)
   }).promise()

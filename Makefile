@@ -49,10 +49,6 @@ cos-auth:
 # Create the package
 package:
 	ibmcloud fn package create choirless \
-	 --param COUCH_USERS_DATABASE $(COUCH_USERS_DATABASE) \
-	 --param COUCH_CHOIRLESS_DATABASE $(COUCH_CHOIRLESS_DATABASE) \
-	 --param COUCH_KEYS_DATABASE $(COUCH_KEYS_DATABASE) \
-	 --param COUCH_QUEUE_DATABASE $(COUCH_QUEUE_DATABASE) \
 	 --param CHOIRLESS_API_URL $(CHOIRLESS_API_URL) \
 	 --param CHOIRLESS_API_KEY $(CHOIRLESS_API_KEY)
 	# Bind COS instance to the package

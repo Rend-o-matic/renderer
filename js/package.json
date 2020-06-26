@@ -1,0 +1,32 @@
+{
+  "name": "renderer",
+  "version": "1.0.2",
+  "description": "Choirless render farm",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "standard": "standard --fix"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Choirless/renderer.git"
+  },
+  "keywords": [
+    "Choirless",
+    "ffmpeg",
+    "video",
+    "render"
+  ],
+  "author": "Glynn Bird <glynn.bird@gmail.com>",
+  "license": "Apache-2.0",
+  "bugs": {
+    "url": "https://github.com/Choirless/renderer/issues"
+  },
+  "homepage": "https://github.com/Choirless/renderer#readme",
+  "dependencies": {
+    "axios": "^0.19.2",
+    "openwhisk": "^3.21.2"
+  },
+  "devDependencies": {
+    "standard": "^14.3.4"
+  }
+}

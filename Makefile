@@ -6,6 +6,7 @@ COS_REGION ?= eu-gb
 RAW_BUCKET_NAME ?= choirless-videos-raw
 CONVERTED_BUCKET_NAME ?= choirless-videos-converted
 TRIMMED_BUCKET_NAME ?= choirless-videos-trimmed
+PREVIEW_BUCKET_NAME ?= choirless-videos-preview
 FINAL_BUCKET_NAME ?= choirless-videos-final
 
 # Namespace functions will be created int
@@ -33,6 +34,7 @@ create-buckets:
 	ibmcloud cos create-bucket --bucket $(RAW_BUCKET_NAME) --ibm-service-instance-id $(COS_INSTANCE_NAME) --region $(COS_REGION)
 	ibmcloud cos create-bucket --bucket $(CONVERTED_BUCKET_NAME) --ibm-service-instance-id $(COS_INSTANCE_NAME) --region $(COS_REGION)
 	ibmcloud cos create-bucket --bucket $(TRIMMED_BUCKET_NAME) --ibm-service-instance-id $(COS_INSTANCE_NAME) --region $(COS_REGION)
+	ibmcloud cos create-bucket --bucket $(PREVIEW_BUCKET_NAME) --ibm-service-instance-id $(COS_INSTANCE_NAME) --region $(COS_REGION)
 	ibmcloud cos create-bucket --bucket $(FINAL_BUCKET_NAME) --ibm-service-instance-id $(COS_INSTANCE_NAME) --region $(COS_REGION)
 
 # Create and set namespace
@@ -78,7 +80,7 @@ actions:
 	# Pass to sticher
 	ibmcloud fn action update choirless/pass_to_sticher aligner/pass_to_sticher.py \
 	 --param src_bucket $(TRIMMED_BUCKET_NAME) \
-	 --param dst_bucket $(FINAL_BUCKET_NAME) \
+	 --param dst_bucket $(PREVIEW_BUCKET_NAME) \
 	 --docker hammertoe/librosa_ml:latest --timeout 600000 --memory 512
 
 	# Sticher

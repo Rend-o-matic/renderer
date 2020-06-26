@@ -37,7 +37,7 @@ def process_signal(o):
 
 # Find the offest with the lowest error
 def find_offset(x0, x1):
-    offsets = tuple(range(-100, 100))
+    offsets = tuple(range(-100, 0))
     errors = [(measure_error(x0, x1, offset), offset) for offset in offsets]
 
     error, offset = sorted(errors)[0]

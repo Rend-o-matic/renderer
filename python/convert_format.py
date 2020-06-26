@@ -37,7 +37,8 @@ def main(args):
         stream = ffmpeg.input(str(file_path))
         video = stream.filter('fps', fps=25, round='up')
         video = video.filter('scale', 640, -1)
-        audio = stream.audio.filter('aresample', 44100)
+        audio = stream.audio.filter('loudnorm')
+        audio = audio.filter('aresample', 44100)
         out = ffmpeg.output(audio, video, str(new_path))
         stdout, stderr = out.run()
 

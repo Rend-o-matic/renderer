@@ -14,11 +14,19 @@ NAMESPACE_NAME ?= choirless
 
 # Choirless API details
 CHOIRLESS_API_URL ?= https://choirless-api.eu-gb.mybluemix.net/
-CHOIRLESS_API_KEY ?= "..."
+CHOIRLESS_API_KEY ?=
+RENDERER_KEY ?= 
 
-all: clean build
+normalbuild: clean package build
 
-build: namespace cos-auth package actions sequences triggers rules list
+build: actions sequences triggers rules list
+
+fullclean: clean deletenamespace
+
+fullbuild: namespace cos-auth build
+
+deletenamespace:
+	ic fn namespace delete $${namespace}
 
 clean:
 	for namespace in `ibmcloud fn namespace list | egrep  "^choirless " | awk '{print $$3}'`; do \
@@ -26,7 +34,6 @@ clean:
 		ic fn action list /$${namespace} | grep "/" | awk '{print $$1}' | xargs -n1 ic fn action delete ; \
 		ic fn rule list /$${namespace} | grep "/" | awk '{print $$1}' | xargs -n1 ic fn rule delete ; \
 		ic fn package list /$${namespace} | grep "/" | awk '{print $$1}' | xargs -n1 ic fn package delete ; \
-		ic fn namespace delete $${namespace} ; \
 	done
 
 # Create buckets in COS
@@ -85,7 +92,14 @@ actions:
 
 	# Renderer
 	ibmcloud fn action update choirless/renderer js/renderer.js \
+	 --web true --web-secure $(RENDERER_KEY) \
 	 --docker choirless/choirless_js_actions:latest --memory 2048 -t 600000
+
+	# Snapshot
+	ibmcloud fn action update choirless/snapshot python/snapshot.py \
+	 --param bucket $(PREVIEW_BUCKET_NAME) \
+	 --docker hammertoe/librosa_ml:latest --timeout 600000 --memory 512
+
 
 sequences:
 	# Calc alignment and Trim amd stitch
@@ -105,6 +119,10 @@ triggers:
 	ibmcloud fn trigger create bucket_trimmed_upload_trigger --feed /whisk.system/cos/changes \
 	 --param bucket $(TRIMMED_BUCKET_NAME) --param event_types write
 
+	# Upload to preview bucket	
+	ibmcloud fn trigger create bucket_preview_upload_trigger --feed /whisk.system/cos/changes \
+	 --param bucket $(PREVIEW_BUCKET_NAME) --param event_types write
+
 rules:
 	# Upload to raw bucket
 	ibmcloud fn rule create bucket_raw_upload_rule bucket_raw_upload_trigger choirless/convert_format
@@ -114,6 +132,9 @@ rules:
 
 	# Upload to trimmed bucket
 	ibmcloud fn rule create bucket_trimmed_upload_rule bucket_trimmed_upload_trigger choirless/stitch
+
+	# Upload to preview bucket
+	ibmcloud fn rule create bucket_preview_upload_rule bucket_preview_upload_trigger choirless/snapshot
 
 list:
 	# Display entities in the current namespace

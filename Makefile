@@ -11,13 +11,6 @@ FINAL_BUCKET_NAME ?= choirless-videos-final
 # Namespace functions will be created int
 NAMESPACE_NAME ?= choirless
 
-# CouchDB config that is passed through to Choirless API
-COUCH_URL ?= "..."
-COUCH_USERS_DATABASE ?= choirless_users
-COUCH_CHOIRLESS_DATABASE ?= choirless
-COUCH_KEYS_DATABASE ?= choirless_keys
-COUCH_QUEUE_DATABASE ?= choirless_queue
-
 # Choirless API details
 CHOIRLESS_API_URL ?= https://choirless-api.eu-gb.mybluemix.net/
 CHOIRLESS_API_KEY ?= "..."

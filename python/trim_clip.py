@@ -30,7 +30,7 @@ def main(args):
         # download file to temp dir
         file_path = Path(tmpdir, key)
         choir_id, song_id, part_id = file_path.stem.split('+')
-        new_path = file_path.with_name(f'output-{file_path.stem}.mp4')
+        new_path = file_path.with_name(f'output-{file_path.stem}.mkv')
         cos.download_file(src_bucket, key, str(file_path))
 
         if offset:
@@ -42,13 +42,13 @@ def main(args):
         else:
             new_path = file_path
 
-        cos.upload_file(str(new_path), dst_bucket, f'{file_path.stem}.mp4')
+        cos.upload_file(str(new_path), dst_bucket, f'{file_path.stem}.mkv')
 
         args["src_bucket"] = src_bucket
         args["dst_bucket"] = dst_bucket
         args["bucket"] = dst_bucket
         args["src_key"] = key
-        args["dst_key"] = f'{file_path.stem}.mp4'
+        args["dst_key"] = f'{file_path.stem}.mkv'
         args["choir_key"] = choir_id
         args["song_id"] = song_id
         args["part_id"] = part_id

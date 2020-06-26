@@ -30,7 +30,7 @@ def main(args):
 
         # download file to temp dir
         file_path = Path(tmpdir, key)
-        new_path = file_path.with_name(f'output-{file_path.stem}.mp4')
+        new_path = file_path.with_name(f'output-{file_path.stem}.mkv')
 
         cos.download_file(src_bucket, key, str(file_path))
 
@@ -39,10 +39,10 @@ def main(args):
         video = video.filter('scale', 640, -1)
         audio = stream.audio.filter('loudnorm')
         audio = audio.filter('aresample', 44100)
-        out = ffmpeg.output(audio, video, str(new_path))
+        out = ffmpeg.output(audio, video, str(new_path), acodec='flac')
         stdout, stderr = out.run()
 
-        cos.upload_file(str(new_path), dst_bucket, f'{file_path.stem}.mp4')
+        cos.upload_file(str(new_path), dst_bucket, f'{file_path.stem}.mkv')
 
         args["src_bucket"] = src_bucket
         args["dst_bucket"] = dst_bucket

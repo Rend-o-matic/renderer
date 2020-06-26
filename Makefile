@@ -49,10 +49,6 @@ cos-auth:
 # Create the package
 package:
 	ibmcloud fn package create choirless \
-	 --param COUCH_USERS_DATABASE $(COUCH_USERS_DATABASE) \
-	 --param COUCH_CHOIRLESS_DATABASE $(COUCH_CHOIRLESS_DATABASE) \
-	 --param COUCH_KEYS_DATABASE $(COUCH_KEYS_DATABASE) \
-	 --param COUCH_QUEUE_DATABASE $(COUCH_QUEUE_DATABASE) \
 	 --param CHOIRLESS_API_URL $(CHOIRLESS_API_URL) \
 	 --param CHOIRLESS_API_KEY $(CHOIRLESS_API_KEY)
 	# Bind COS instance to the package
@@ -61,34 +57,34 @@ package:
 # Actions
 actions:
 	# Convert format
-	ibmcloud fn action update choirless/convert_format aligner/convert_format.py \
+	ibmcloud fn action update choirless/convert_format python/convert_format.py \
 	 --param src_bucket $(RAW_BUCKET_NAME) \
          --param dst_bucket $(CONVERTED_BUCKET_NAME) \
 	 --docker hammertoe/librosa_ml:latest --timeout 600000 --memory 512
 
 	# Calculate alignment
-	ibmcloud fn action update choirless/calculate_alignment aligner/calculate_alignment.py \
+	ibmcloud fn action update choirless/calculate_alignment python/calculate_alignment.py \
 	 --param bucket $(CONVERTED_BUCKET_NAME) \
 	 --docker hammertoe/librosa_ml:latest --timeout 600000 --memory 512
 
 	# Trim clip
-	ibmcloud fn action update choirless/trim_clip aligner/trim_clip.py \
+	ibmcloud fn action update choirless/trim_clip python/trim_clip.py \
 	 --param src_bucket $(CONVERTED_BUCKET_NAME) \
 	 --param dst_bucket $(TRIMMED_BUCKET_NAME)  \
 	 --docker hammertoe/librosa_ml:latest --timeout 600000 --memory 512
 
 	# Pass to sticher
-	ibmcloud fn action update choirless/pass_to_sticher aligner/pass_to_sticher.py \
+	ibmcloud fn action update choirless/pass_to_sticher python/pass_to_sticher.py \
 	 --param src_bucket $(TRIMMED_BUCKET_NAME) \
 	 --param dst_bucket $(PREVIEW_BUCKET_NAME) \
 	 --docker hammertoe/librosa_ml:latest --timeout 600000 --memory 512
 
 	# Sticher
-	ibmcloud fn action update choirless/stitcher stitcher/index.js \
+	ibmcloud fn action update choirless/stitcher js/stitcher.js \
          --docker choirless/choirless_js_actions:latest --memory 2048 -t 600000
 
 	# Renderer
-	ibmcloud fn action update choirless/renderer renderer/index.js -P renderer/config.json \
+	ibmcloud fn action update choirless/renderer js/renderer.js \
 	 --docker choirless/choirless_js_actions:latest --memory 2048 -t 600000
 
 sequences:

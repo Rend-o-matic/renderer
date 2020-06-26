@@ -1,15 +1,14 @@
 {
-  "name": "stitcher",
-  "version": "1.0.0",
-  "description": "Choirless serverless sticheroo service",
-  "main": "index.js",
+  "name": "renderer",
+  "version": "1.0.2",
+  "description": "Choirless render farm",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
     "standard": "standard --fix"
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/Choirless/stitcher.git"
+    "url": "git+https://github.com/Choirless/renderer.git"
   },
   "keywords": [
     "Choirless",
@@ -20,13 +19,12 @@
   "author": "Glynn Bird <glynn.bird@gmail.com>",
   "license": "Apache-2.0",
   "bugs": {
-    "url": "https://github.com/Choirless/stitcher/issues"
+    "url": "https://github.com/Choirless/renderer/issues"
   },
-  "homepage": "https://github.com/Choirless/stitcher#readme",
+  "homepage": "https://github.com/Choirless/renderer#readme",
   "dependencies": {
-    "choirlessapi": "Choirless/choirlessapi",
-    "ibm-cos-sdk": "^1.6.1",
-    "stitcheroo": "^1.1.0"
+    "axios": "^0.19.2",
+    "openwhisk": "^3.21.2"
   },
   "devDependencies": {
     "standard": "^14.3.4"

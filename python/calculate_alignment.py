@@ -114,7 +114,7 @@ def main(args):
                                 sr=SAMPLE_RATE,
                                 mono=True,
                                 offset=5,
-                                duration=20)
+                                duration=180)
 
     # load in the leader
     x0, fs0 = load_from_cos(reference_key)

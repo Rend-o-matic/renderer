@@ -24,6 +24,7 @@
   },
   "homepage": "https://github.com/Choirless/renderer#readme",
   "dependencies": {
+    "axios": "^0.19.2",
     "openwhisk": "^3.21.2"
   },
   "devDependencies": {

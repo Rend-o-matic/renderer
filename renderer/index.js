@@ -1,14 +1,7 @@
-const path = require('path')
 const openwhisk = require('openwhisk')
+const axios = require('axios').default
 
 const main = async (opts) => {
-  // put incoming opts into environment variables for choirlessapi
-  const OPTS = ['COUCH_URL', 'COUCH_USERS_DATABASE', 'COUCH_CHOIRLESS_DATABASE', 'COUCH_KEYS_DATABASE', 'COUCH_QUEUE_DATABASE']
-  for (const i in OPTS) {
-    process.env[OPTS[i]] = opts[OPTS[i]]
-  }
-  const choirlessAPI = require('choirlessapi')
-
   // get the songid/choirId parameters
   const songId = opts.songId
   const choirId = opts.choirId
@@ -16,13 +9,25 @@ const main = async (opts) => {
     return { ok: false, message: 'missing parameters' }
   }
 
-  // get the song parts from the database
-  const response = await choirlessAPI.getChoirSongParts({ songId: songId, choirId: choirId })
+  // get the song parts from the API
+  const req = {
+    method: 'get',
+    baseURL: opts.CHOIRLESS_API_URL,
+    url: '/choir/songparts',
+    params: {
+      apikey: opts.CHOIRLESS_API_KEY,
+      songId: songId,
+      choirId: choirId
+    },
+    responseType: 'json'
+  }
+  const httpResponse = await axios(req)
+  const response = httpResponse.data
   console.log('choirlessAPI response', response)
 
   // calculate the filenames of the videos
   const videos = response.parts.map((p) => {
-      return [p.choirId, p.songId, p.partId].join('+') + '.mp4'
+    return [p.choirId, p.songId, p.partId].join('+') + '.mp4'
   })
   const outputKey = [choirId, songId, 'final'].join('+') + '.mp4'
   console.log('COS keys', videos)

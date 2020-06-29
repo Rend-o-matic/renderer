@@ -6,6 +6,7 @@ import numpy as np
 import re
 import tempfile
 from pathlib import Path
+from urllib.parse import urljoin
 
 import requests
 
@@ -89,7 +90,7 @@ def main(args):
         params = {'apikey': api_key,
                   'choirId': choir_id,
                   'songId': song_id,}
-        req = requests.get(f"{api_url}/choir/songparts",
+        req = requests.get(urljoin(api_url, 'choir/songparts'),
                            params=params)
         parts = req.json()['parts']
 

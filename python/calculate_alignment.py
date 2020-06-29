@@ -74,14 +74,6 @@ def main(args):
     # for a specially named partid, or then via the Choirless API
     reference_key = f"{choir_id}+{song_id}+reference.{ext}"
 
-    # Abort if we are the reference part
-    if part_id == 'reference':
-        args["offset"] = 0
-        args["err"] = 0
-        args['rendition_key'] = rendition_key
-        args['reference_key'] = reference_key
-        return args
-
     # Ask the API if we have parts for this Song
     try:
         api_url = args['CHOIRLESS_API_URL']
@@ -100,6 +92,14 @@ def main(args):
                 reference_key = f"{part['choirId']}+{part['songId']}+{part['partId']}.mkv"
     except:
         print(f"Could not look up part in API: choidId {choir_id} songId {song_id}")
+
+    # Abort if we are the reference part
+    if rendition_key == reference_key:
+        args["offset"] = 0
+        args["err"] = 0
+        args['rendition_key'] = rendition_key
+        args['reference_key'] = reference_key
+        return args
 
     args['rendition_key'] = rendition_key
     args['reference_key'] = reference_key

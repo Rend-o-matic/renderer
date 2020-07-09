@@ -139,7 +139,15 @@ def main(args):
     # Actually calculate the offset
     offset, error = find_offset(s0, s1)
 
-    args["offset"] = ((offset * 512) / SAMPLE_RATE) * 1000
+    # Convert offset to milliseconds
+    offset = int(((offset * 512) / SAMPLE_RATE) * 1000)
+
+    # If the offset is too great, assume we failed and fallback to zero
+    if offset > 500:
+        print(f"Offset was too great ({offset}) so falling back to zero")
+        offset = 0
+
+    args["offset"] = offset
     args["err"] = error
 
     return args

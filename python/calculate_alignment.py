@@ -88,7 +88,7 @@ def main(args):
 
         # Check each part and look for the reference one
         for part in parts:
-            if part['partType'] == 'reference':
+            if part['partType'] == 'backing':
                 reference_key = f"{part['choirId']}+{part['songId']}+{part['partId']}.mkv"
     except:
         print(f"Could not look up part in API: choidId {choir_id} songId {song_id}")

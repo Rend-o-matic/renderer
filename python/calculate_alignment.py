@@ -114,7 +114,7 @@ def main(args):
             return librosa.load(file_path,
                                 sr=SAMPLE_RATE,
                                 mono=True,
-                                offset=5,
+                                offset=0,
                                 duration=180)
 
     # load in the leader

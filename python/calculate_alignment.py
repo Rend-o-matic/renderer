@@ -15,35 +15,47 @@ from ibm_botocore.client import Config
 
 
 SAMPLE_RATE = 44100
+HOP_LENGTH = 512
 
 # function to process the signals and get something that
 # we can compare against each other.
-def process_signal(o):
-    # normalise the values (zscore)
-    o = (o - np.mean(o)) / np.std(o)
-    # take any values > 2 standard deviations
-    o = np.where(o > 2, 1.0, 0.0)
+def process_signal(x, sr):
 
-    # add an 'decay' to the values such that we can do a more 'fuzzy' match
-    # forward pass
-    for i in range(1, len(o)):
-        o[i] = max(o[i], o[i-1] * 0.9)
+    onset_env = librosa.onset.onset_strength(x, sr=sr,
+                                             aggregate=np.median)
+    print("Calculated onset_env")
 
-    # backwards pass
-    for i in range(len(o)-2, 0, -1):
-        o[i] = max(o[i], o[i+1] * 0.9)
+    tempo, beats = librosa.beat.beat_track(onset_envelope=onset_env,
+                                           sr=sr)
+    print("Calculated tempo and beats")
 
-    return o
+    times = librosa.times_like(onset_env, sr=sr, hop_length=HOP_LENGTH)
+
+    print("Calculated times")
+
+    data = np.zeros(len(onset_env))
+    np.put(data, beats, 1)
+    for i in range(1, len(data)):
+        data[i] = max(data[i], data[i-1] * 0.9)
+
+    for i in range(len(data) - 2, 0, -1):
+        data[i] = max(data[i], data[i+1] * 0.9)
+
+    return times, data, tempo, beats
 
 
 # Find the offest with the lowest error
 def find_offset(x0, x1):
-    offsets = tuple(range(-100, 0))
-    errors = [(measure_error(x0, x1, offset), offset) for offset in offsets]
+    offset = 0
+    best_error = measure_error(x0, x1, offset)
+    while 1:
+        error = measure_error(x0, x1, offset - 1)
+        if error > best_error:
+            break
+        offset -= 1
+        best_error = error
 
-    error, offset = sorted(errors)[0]
-
-    return -offset, error
+    return -offset, best_error
 
 
 # function to measure two waveforms with one offset by a certian amount
@@ -119,31 +131,26 @@ def main(args):
 
     # load in the leader
     x0, fs0 = load_from_cos(reference_key)
+    print("Loaded from COS: ", reference_key)
 
     # load in sarah
     x1, fs1 = load_from_cos(rendition_key)
+    print("Loaded from COS: ", rendition_key)
 
-    # Normalise the two signals so that they are the same average
-    # amplitude (volume)
-    x0 = (x0 - np.mean(x0)) / np.std(x0)
-    x1 = (x1 - np.mean(x1)) / np.std(x1)
-
-    # Calculate the 'onset strength' of the files, ie where parts start
-    o0 = librosa.onset.onset_strength(x0, sr=fs0)
-    o1 = librosa.onset.onset_strength(x1, sr=fs1)
-
-    # process the signal of the leader and sarah
-    s0 = process_signal(o0)
-    s1 = process_signal(o1)
+    times0, data0, tempo0, beats0 = process_signal(x0, fs0)
+    print("Tempo0:", tempo0)
+    times1, data1, tempo1, beats1 = process_signal(x1, fs1)
+    print("Tempo1:", tempo1)
 
     # Actually calculate the offset
-    offset, error = find_offset(s0, s1)
+    offset, error = find_offset(data0, data1)
+    print(f"Offset: {offset} Error: {error}")
 
     # Convert offset to milliseconds
-    offset = int(((offset * 512) / SAMPLE_RATE) * 1000)
+    offset = int(((offset * HOP_LENGTH) / SAMPLE_RATE) * 1000)
 
     # If the offset is too great, assume we failed and fallback to zero
-    if offset > 500:
+    if offset > 700:
         print(f"Offset was too great ({offset}) so falling back to zero")
         offset = 0
 

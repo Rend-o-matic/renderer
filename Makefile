@@ -101,9 +101,9 @@ actions:
 	 --docker $(NODEJS_IMAGE) --memory 2048 -t 600000
 
 	# Snapshot
-	ibmcloud fn action update choirless/snapshot python/snapshot.py \
+	ibmcloud fn action update choirless/snapshot python/snapshot_smiler.py \
 	 --param bucket $(PREVIEW_BUCKET_NAME) \
-	 --docker $(LIBROSA_IMAGE) --timeout 600000 --memory 512
+	 --docker $(LIBROSA_IMAGE) --timeout 600000 --memory 2048
 
 	# Status report
 	ibmcloud fn action update choirless/status python/status.py

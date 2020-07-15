@@ -8,6 +8,7 @@ CONVERTED_BUCKET_NAME ?= choirless-videos-converted
 TRIMMED_BUCKET_NAME ?= choirless-videos-trimmed
 PREVIEW_BUCKET_NAME ?= choirless-videos-preview
 FINAL_BUCKET_NAME ?= choirless-videos-final
+STATUS_BUCKET_NAME ?= choirless-videos-status
 
 # Namespace functions will be created int
 NAMESPACE_NAME ?= choirless
@@ -16,6 +17,10 @@ NAMESPACE_NAME ?= choirless
 CHOIRLESS_API_URL ?= https://choirless-api.eu-gb.mybluemix.net/
 CHOIRLESS_API_KEY ?=
 RENDERER_KEY ?= 
+
+# Docker images
+LIBROSA_IMAGE ?= choirless/choirless_py_actions:release-0.2
+NODEJS_IMAGE ?= choirless/choirless_js_actions:release-0.2
 
 normalbuild: clean package build
 
@@ -67,39 +72,41 @@ actions:
 	ibmcloud fn action update choirless/convert_format python/convert_format.py \
 	 --param src_bucket $(RAW_BUCKET_NAME) \
          --param dst_bucket $(CONVERTED_BUCKET_NAME) \
-	 --docker hammertoe/librosa_ml:latest --timeout 600000 --memory 512
+	 --docker $(LIBROSA_IMAGE) --timeout 600000 --memory 512
 
 	# Calculate alignment
 	ibmcloud fn action update choirless/calculate_alignment python/calculate_alignment.py \
 	 --param bucket $(CONVERTED_BUCKET_NAME) \
-	 --docker hammertoe/librosa_ml:latest --timeout 600000 --memory 512
+	 --docker $(LIBROSA_IMAGE) --timeout 600000 --memory 2048
 
 	# Trim clip
 	ibmcloud fn action update choirless/trim_clip python/trim_clip.py \
 	 --param src_bucket $(CONVERTED_BUCKET_NAME) \
 	 --param dst_bucket $(TRIMMED_BUCKET_NAME)  \
-	 --docker hammertoe/librosa_ml:latest --timeout 600000 --memory 512
+	 --docker $(LIBROSA_IMAGE) --timeout 600000 --memory 512
 
 	# Pass to sticher
 	ibmcloud fn action update choirless/pass_to_sticher python/pass_to_sticher.py \
 	 --param src_bucket $(TRIMMED_BUCKET_NAME) \
 	 --param dst_bucket $(PREVIEW_BUCKET_NAME) \
-	 --docker hammertoe/librosa_ml:latest --timeout 600000 --memory 512
+	 --docker $(LIBROSA_IMAGE) --timeout 600000 --memory 512
 
 	# Sticher
 	ibmcloud fn action update choirless/stitcher js/stitcher.js \
-         --docker choirless/choirless_js_actions:latest --memory 2048 -t 600000
+         --docker $(NODEJS_IMAGE) --memory 2048 -t 600000
 
 	# Renderer
 	ibmcloud fn action update choirless/renderer js/renderer.js \
 	 --web true --web-secure $(RENDERER_KEY) \
-	 --docker choirless/choirless_js_actions:latest --memory 2048 -t 600000
+	 --docker $(NODEJS_IMAGE) --memory 2048 -t 600000
 
 	# Snapshot
 	ibmcloud fn action update choirless/snapshot python/snapshot.py \
 	 --param bucket $(PREVIEW_BUCKET_NAME) \
-	 --docker hammertoe/librosa_ml:latest --timeout 600000 --memory 512
+	 --docker $(LIBROSA_IMAGE) --timeout 600000 --memory 512
 
+	# Status report
+	ibmcloud fn action update choirless/status python/status.py
 
 sequences:
 	# Calc alignment and Trim amd stitch
@@ -111,30 +118,46 @@ triggers:
 	ibmcloud fn trigger create bucket_raw_upload_trigger --feed /whisk.system/cos/changes \
 	 --param bucket $(RAW_BUCKET_NAME) --param event_types write
 
+	ibmcloud fn trigger create bucket_raw_status_trigger --feed /whisk.system/cos/changes \
+	 --param bucket $(RAW_BUCKET_NAME) --param event_types write
+
 	# Upload to converted bucket
 	ibmcloud fn trigger create bucket_converted_upload_trigger --feed /whisk.system/cos/changes \
+	 --param bucket $(CONVERTED_BUCKET_NAME) --param event_types write
+
+	ibmcloud fn trigger create bucket_converted_status_trigger --feed /whisk.system/cos/changes \
 	 --param bucket $(CONVERTED_BUCKET_NAME) --param event_types write
 
 	# Upload to trimmed bucket
 	ibmcloud fn trigger create bucket_trimmed_upload_trigger --feed /whisk.system/cos/changes \
 	 --param bucket $(TRIMMED_BUCKET_NAME) --param event_types write
 
+	ibmcloud fn trigger create bucket_trimmed_status_trigger --feed /whisk.system/cos/changes \
+	 --param bucket $(TRIMMED_BUCKET_NAME) --param event_types write
+
 	# Upload to preview bucket	
 	ibmcloud fn trigger create bucket_preview_upload_trigger --feed /whisk.system/cos/changes \
+	 --param bucket $(PREVIEW_BUCKET_NAME) --param event_types write
+
+	ibmcloud fn trigger create bucket_preview_status_trigger --feed /whisk.system/cos/changes \
 	 --param bucket $(PREVIEW_BUCKET_NAME) --param event_types write
 
 rules:
 	# Upload to raw bucket
 	ibmcloud fn rule create bucket_raw_upload_rule bucket_raw_upload_trigger choirless/convert_format
+	ibmcloud fn rule create bucket_raw_status_rule bucket_raw_status_trigger choirless/status
 
 	# Upload to converted bucket
 	ibmcloud fn rule create bucket_converted_upload_rule bucket_converted_upload_trigger choirless/calc_and_trim
+	ibmcloud fn rule create bucket_converted_status_rule bucket_converted_status_trigger choirless/status
 
 	# Upload to trimmed bucket
 	ibmcloud fn rule create bucket_trimmed_upload_rule bucket_trimmed_upload_trigger choirless/stitch
+	ibmcloud fn rule create bucket_trimmed_status_rule bucket_trimmed_status_trigger choirless/status
 
 	# Upload to preview bucket
 	ibmcloud fn rule create bucket_preview_upload_rule bucket_preview_upload_trigger choirless/snapshot
+	ibmcloud fn rule create bucket_preview_status_rule bucket_preview_status_trigger choirless/status
 
 list:
 	# Display entities in the current namespace

@@ -47,12 +47,16 @@ def process_signal(x, sr):
 
 # Find the offest with the lowest error
 def find_offset(x0, x1):
+    error0 = measure_error(x0, x1, 0)
     offsets = np.arange(0,50)
     errors = np.array([measure_error(x0, x1, -offset) for offset in offsets])
     best_offset = argrelextrema(errors, np.less)[0][0]
     best_error = errors[best_offset]
 
-    return best_offset, best_error
+    if error0 <= best_error:
+        return 0, error0
+    else:
+        return best_offset, best_error
 
 
 # function to measure two waveforms with one offset by a certian amount

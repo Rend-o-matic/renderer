@@ -7,6 +7,7 @@ import re
 import tempfile
 from pathlib import Path
 from urllib.parse import urljoin
+from scipy.signal import argrelextrema
 
 import requests
 
@@ -46,16 +47,12 @@ def process_signal(x, sr):
 
 # Find the offest with the lowest error
 def find_offset(x0, x1):
-    offset = 0
-    best_error = measure_error(x0, x1, offset)
-    while 1:
-        error = measure_error(x0, x1, offset - 1)
-        if error > best_error:
-            break
-        offset -= 1
-        best_error = error
+    offsets = np.arange(0,50)
+    errors = np.array([measure_error(x0, x1, -offset) for offset in offsets])
+    best_offset = argrelextrema(errors, np.less)[0][0]
+    best_error = errors[best_offset]
 
-    return -offset, best_error
+    return best_offset, best_error
 
 
 # function to measure two waveforms with one offset by a certian amount
@@ -134,6 +131,7 @@ def main(args):
     print("Loaded from COS: ", reference_key)
 
     # load in sarah
+    print("Loading from COS: ", rendition_key)
     x1, fs1 = load_from_cos(rendition_key)
     print("Loaded from COS: ", rendition_key)
 

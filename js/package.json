@@ -25,8 +25,7 @@
   "dependencies": {
     "axios": "^0.19.2",
     "boxjam": "0.0.21",
-    "ibm-cos-sdk": "^1.6.1",
-    "kuuid": "^0.5.1"
+    "ibm-cos-sdk": "^1.6.1"
   },
   "devDependencies": {
     "standard": "^14.3.4"

@@ -1,6 +1,5 @@
 const axios = require('axios').default
 const boxjam = require('boxjam')
-const kuuid = require('kuuid')
 const ibmCOS = require('ibm-cos-sdk')
 
 const main = async (opts) => {
@@ -101,7 +100,7 @@ const main = async (opts) => {
     console.log('output', JSON.stringify(output))
 
     // write the definition to a COS bucket
-    const key = [opts.choirId, opts.songId, kuuid.id()].join('+') + '.json'
+    const key = [opts.choirId, opts.songId, 'auto'].join('+') + '.json'
     await cos.putObject({ Bucket: opts.COS_BUCKET, Key: key, Body: JSON.stringify(output) }).promise()
     console.log('written key', key)
     return { ok: true }

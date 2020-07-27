@@ -24,7 +24,9 @@
   "homepage": "https://github.com/Choirless/renderer#readme",
   "dependencies": {
     "axios": "^0.19.2",
-    "openwhisk": "^3.21.2"
+    "boxjam": "0.0.21",
+    "ibm-cos-sdk": "^1.6.1",
+    "kuuid": "^0.5.1"
   },
   "devDependencies": {
     "standard": "^14.3.4"

@@ -1,5 +1,7 @@
-const openwhisk = require('openwhisk')
 const axios = require('axios').default
+const boxjam = require('boxjam')
+const kuuid = require('kuuid')
+const ibmCOS = require('ibm-cos-sdk')
 
 const main = async (opts) => {
   // get the songid/choirId parameters
@@ -8,6 +10,28 @@ const main = async (opts) => {
   if (!songId || !choirId) {
     return { ok: false, message: 'missing parameters' }
   }
+
+  // get optional parameters
+  const width = opts.width || 1920
+  const height = opts.height || 1080
+  const reverb = opts.reverb || 0.1
+  const reverbType = opts.reverbType || 'hall'
+  const panning = opts.panning || true
+  const watermark = opts.watermark || null
+
+  // COS
+  opts.COS_ENDPOINT = opts.COS_ENDPOINT || opts.endpoint || 'https://s3.us.cloud-object-storage.appdomain.cloud'
+  const cosCreds = opts.__bx_creds ? opts.__bx_creds['cloud-object-storage'] : undefined
+  if (cosCreds) {
+    opts.COS_API_KEY = opts.COS_API_KEY || cosCreds.apikey
+    opts.COS_INSTANCE_ID = opts.COS_INSTANCE_ID || cosCreds.resource_instance_id
+  }
+  const config = {
+    endpoint: opts.COS_ENDPOINT,
+    apiKeyId: opts.COS_API_KEY,
+    serviceInstanceId: opts.COS_INSTANCE_ID
+  }
+  const cos = new ibmCOS.S3(config)
 
   // get the song parts from the API
   const req = {
@@ -25,32 +49,64 @@ const main = async (opts) => {
   const response = httpResponse.data
   console.log('choirlessAPI response', response)
 
-  // calculate the filenames of the videos
-  const videos = response.parts.map((p) => {
-    return [p.choirId, p.songId, p.partId].join('+') + '.mp4'
-  })
-  const outputKey = [choirId, songId, 'final'].join('+') + '.mp4'
-  console.log('COS keys', videos)
+  // turn the song parts in to an array of rectangle objects
+  if (response.ok && response.parts.length > 0) {
+    const rectangles = []
+    for (var i in response.parts) {
+      const p = response.parts[i]
+      const ar = p.aspectRatio.split(':')
+      const w = parseInt(ar[0])
+      const h = parseInt(ar[1])
+      const obj = {
+        id: p.partId,
+        width: w,
+        height: h
+      }
+      rectangles.push(obj)
+    }
+    console.log('rectangles', rectangles)
 
-  // call the sticher service
-  const ow = openwhisk()
-  const params = {
-    videos: videos,
-    width: 720,
-    height: 390,
-    center: true,
-    pan: true,
-    margin: 20,
-    reverbType: 'hall',
-    reverbMix: 0.1,
-    outputKey: outputKey
-  }
-  console.log(params)
-  try {
-    const invocation = await ow.actions.invoke({ name: 'choirless/stitcher', params: params })
-    return { ok: true, key: invocation }
-  } catch (e) {
-    console.error(e)
+    // boxjam
+    const container = { width: width, height: height }
+    const margin = 10
+    const shouldCenter = true
+    const adjustedRectangles = boxjam(rectangles, container, margin, shouldCenter)
+    console.log('boxjam says', adjustedRectangles)
+
+    // construct output JSON
+    const output = {
+      choir_id: choirId,
+      song_id: songId,
+      output: {
+        size: [width, height],
+        reverb: reverb,
+        reverb_type: reverbType,
+        panning: panning,
+        watermark: watermark
+      },
+      inputs: adjustedRectangles.map((r) => {
+        // calculate stereo pan from where the middle of the video overlay
+        // pan goes from -1 (left) to 0 (centre) to 1 (right)
+        const pan = (2 * ((r.x + r.width / 2) / width) - 1)
+        return {
+          part_id: r.id,
+          position: [r.x, r.y],
+          size: [r.width, r.height],
+          volume: 1.0,
+          panning: pan,
+          offset: 0
+        }
+      })
+    }
+    console.log('output', JSON.stringify(output))
+
+    // write the definition to a COS bucket
+    const key = [opts.choirId, opts.songId, kuuid.id()].join('+') + '.json'
+    await cos.putObject({ Bucket: opts.COS_BUCKET, Key: key, Body: JSON.stringify(output) }).promise()
+    console.log('written key', key)
+    return { ok: true }
+  } else {
+    console.log('Nothing to do')
     return { ok: false }
   }
 }

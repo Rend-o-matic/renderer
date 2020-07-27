@@ -11,13 +11,25 @@ A serverless function that takes a `choirId` & `songId`:
 
 The `main` function expects an object with the following attributes:
 
-- `choirId` - the id choir whose song is to be rendered.
-- `songId` - the id of the song to render.
-- `COUCH_URL` - the URL of the Cloudant service (including credentials).
-- `COUCH_USERS_DATABASE` - the name of the users database e.g. 'choirless_users'.
-- `COUCH_CHOIRLESS_DATABASE` - the name of the main database e.g. 'choirless'.
-- `COUCH_KEYS_DATABASE` - the name of the keys database e.g. 'choirless_keys'.
-- `COUCH_QUEUE_DATABASE` - the name of the queue database e.g. 'choirless_queue'.
+- `choirId` - the id choir whose song is to be rendered. (required)
+- `songId` - the id of the song to render. (required)
+- `CHOIRLESS_API_URL` - the URL Choirless API (required).
+- `CHOIRLESS_API_KEY` - the API key for the Choirless API (required).
+- `COS_ENDPOINT` - COS endpoint (required)
+- `COS_API_KEY` - COS API Key (required)
+- `COS_INSTANCE_ID` - COS service instance id (required)
+- `COS_BUCKET` - the name of the COS bucket to write the output definition to (required)s
+
+optional parameters:
+
+- `width` - the number of horizontal pixels in the output video (default: `1920`)
+- `height` - the number of vertical pixels in the output video (default: `1080`)
+- `reverb` - the amount of reverb to add 0 = none, 1 = lots (default: `0.1`)
+- `reverbType` - the type of reverb to add: `none`, `smallroom`, `largeroom`, `hall`, `church`  (default `hall`)
+- `panning` - whether to pan audio according to video's horizonal position (default:  `true`)
+- `watermark` - filename of watermark image (default: `null`)
+
+> Note: items in capitals are usually embedded in the serverless function "package"
 
 ## Example usage
 
@@ -25,10 +37,11 @@ The `main` function expects an object with the following attributes:
 const go = async () => {
   const opts = {
     COUCH_URL: 'https://u:p@myhost.cloudant.com',
-    COUCH_USERS_DATABASE: 'choirless_users',
     COUCH_CHOIRLESS_DATABASE: 'choirless',
-    COUCH_KEYS_DATABASE: 'choirless_keys',
-    COUCH_QUEUE_DATABASE: 'choirless_queue',
+    COS_ENDPOINT: 'https://cos.someendpoint.com',
+    COS_API_KEY: 'someapikey,
+    COS_INSTANCE_ID: 'someinstanceid',
+    COS_BUCKET: 'somebucketname',
     songId: 'songId',
     choirId: 'choirId'
   }
@@ -38,20 +51,6 @@ const go = async () => {
     console.log('ERROR', e)
   }
 }
-```
-
-## Assumptions
-
-Song part videos are stored in the COS bucket with keys
-
-```
-<choirId>/<songId>/<partId>.mp4
-```
-
-The final video is stored as
-
-```
-<choirId>/<songId>/final.mp4
 ```
 
 ## Building Docker image

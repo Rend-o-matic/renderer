@@ -28,6 +28,8 @@ optional parameters:
 - `reverbType` - the type of reverb to add: `none`, `smallroom`, `largeroom`, `hall`, `church`  (default `hall`)
 - `panning` - whether to pan audio according to video's horizonal position (default:  `true`)
 - `watermark` - filename of watermark image (default: `null`)
+- `center` - whether to centre the videos (default: `true`)
+- `margin` - the number of pixels margin between videos (default: `10`)
 
 > Note: items in capitals are usually embedded in the serverless function "package"
 

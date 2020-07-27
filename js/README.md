@@ -53,6 +53,51 @@ const go = async () => {
 }
 ```
 
+### Output
+
+```js
+{
+	"choir_id": "001jtqPK3709Op2285kQ27t8Jc30NULC",
+	"song_id": "001jtuMI4bZ1FC3AaBtX2IaLcL4AKbDQ",
+	"output": {
+		"size": [1920, 1080],
+		"reverb": 0.1,
+		"reverb_type": "hall",
+		"panning": true,
+		"watermark": null
+	},
+	"inputs": [{
+		"part_id": "001jtuYx0XUzd80b00Ld33fR0o0TMES6",
+		"position": [315, 55],
+		"size": [640, 480],
+		"volume": 1,
+		"panning": -0.33854166666666663,
+		"offset": 0
+	}, {
+		"part_id": "001juWUB17nWwY1WN9mY3aooHu2OLymk",
+		"position": [965, 55],
+		"size": [640, 480],
+		"volume": 1,
+		"panning": 0.33854166666666674,
+		"offset": 0
+	}, {
+		"part_id": "001juWlF3nhRa230t8WP2NhoRb2qa1Ka",
+		"position": [315, 545],
+		"size": [640, 480],
+		"volume": 1,
+		"panning": -0.33854166666666663,
+		"offset": 0
+	}, {
+		"part_id": "001juWze2dBn3q4Gcbdn2sDLH73GSNdx",
+		"position": [965, 545],
+		"size": [640, 480],
+		"volume": 1,
+		"panning": 0.33854166666666674,
+		"offset": 0
+	}]
+}
+```
+
 ## Building Docker image
 
 ```sh

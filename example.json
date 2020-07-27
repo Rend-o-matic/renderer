@@ -1,0 +1,29 @@
+{
+    output = {
+        size = [1080, 720],
+        reverb = 0.1,
+        reverb_type = "hall",
+        panning	= true,
+        watermark = "choirless.png"
+    },
+    inputs = [
+        {
+            "filename": "part1.mkv",
+            "position": ["20, 30"],
+            "size": [200, 300],
+            "volume": 0.2,
+            "panning": -0.15,
+            "offet": 0,
+        },
+        {
+            "filename": "part2.mkv",
+            "position": ["22, 30"],
+            "size": [200, 300],
+            "volume" 1.0,
+            "panning": 0.3
+            "offset": 230,
+        }
+        ,
+        { ... }
+    ]
+}

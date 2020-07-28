@@ -18,7 +18,7 @@ The `main` function expects an object with the following attributes:
 - `COS_ENDPOINT` - COS endpoint (required)
 - `COS_API_KEY` - COS API Key (required)
 - `COS_INSTANCE_ID` - COS service instance id (required)
-- `COS_BUCKET` - the name of the COS bucket to write the output definition to (required)s
+- `COS_BUCKET` - the name of the COS bucket to write the output definition to (required)
 
 optional parameters:
 

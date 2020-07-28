@@ -17,6 +17,8 @@ const main = async (opts) => {
   const reverbType = opts.reverbType || 'hall'
   const panning = opts.panning || true
   const watermark = opts.watermark || null
+  const margin = opts.margin || 10
+  const center = opts.center || true
 
   // COS
   opts.COS_ENDPOINT = opts.COS_ENDPOINT || opts.endpoint || 'https://s3.us.cloud-object-storage.appdomain.cloud'
@@ -67,9 +69,7 @@ const main = async (opts) => {
 
     // boxjam
     const container = { width: width, height: height }
-    const margin = 10
-    const shouldCenter = true
-    const adjustedRectangles = boxjam(rectangles, container, margin, shouldCenter)
+    const adjustedRectangles = boxjam(rectangles, container, margin, center)
     console.log('boxjam says', adjustedRectangles)
 
     // construct output JSON

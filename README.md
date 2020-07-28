@@ -8,12 +8,17 @@ Some actions are built in Python, the rest in Node.js.
 
 The following actions can be found in this repository:
 
+### JavaScript
+
+- `renderer` - given a choirId & songId, pulls the list of song parts from the Choirless API then calls `stitcher` to render them together.
+
+### Python
+
 - `convert_format` - uses [ffmpeg](https://ffmpeg.org/) to convert user-generated videos in `.webm` format into `.mp4` format for further processing.
 - `calculate_alignment` - compares two audio streams using [librosa](https://github.com/librosa/librosa) to calculate the latency between them.
 - `trim_clip` - time-shifts a video by a supplied offset to bring it align with the others.
 - `pass_to_sticher` - development function to call the `stitcher` action.
-- `renderer` - given a choirId & songId, pulls the list of song parts from the Choirless API then calls `stitcher` to render them together.
-- `stitcher` - a thin wrapper around the [Stitcheroo](https://github.com/Choirless/Stitcheroo) library to join a supplied list of videos together.
+
 
 ## Docker
 

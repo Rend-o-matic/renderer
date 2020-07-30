@@ -1,5 +1,5 @@
 # https://github.com/apache/openwhisk/blob/master/docs/actions-docker.md
-FROM choirless/librosa_ml:release-2.0
+FROM choirless/librosa_ml:release-2.4
 
 RUN apt-get update && \
     apt-get install -y libsm6 libxext6 libxrender-dev \

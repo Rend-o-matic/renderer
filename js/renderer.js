@@ -55,6 +55,9 @@ const main = async (opts) => {
     const rectangles = []
     for (var i in response.parts) {
       const p = response.parts[i]
+      if (!p.aspectRatio) {
+        p.aspectRatio = '640:480'
+      }
       const ar = p.aspectRatio.split(':')
       const w = parseInt(ar[0])
       const h = parseInt(ar[1])

@@ -43,7 +43,7 @@ def mqtt_status(helper=None):
             msg['start'] = int(t1)
 
             if helper_ is not None:
-                msg.extend(helper_(args))
+                msg.update(helper_(args))
             
             publish.single(
                 f"choirless/{choir_id}/{song_id}/renderer/{stage}",

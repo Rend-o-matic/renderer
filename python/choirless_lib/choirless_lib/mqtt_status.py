@@ -4,20 +4,19 @@ import json
 import os
 import time
 
-def mqtt_status(stage=None):
-    stage_ = stage
+def mqtt_status(helper=None):
+    helper_ = helper
     
     def wrap(method):
         
         def wrapped_f(args):
 
-            if stage_ is None:
-                stage = os.environ.get('__OW_ACTION_NAME')
-                
-                if stage is not None:
-                    stage = stage.split('/')[-1]
-                else:
-                    stage = 'unknown'
+            # Get the stage from the current env
+            stage = os.environ.get('__OW_ACTION_NAME')
+            try:
+                stage = stage.split('/')[-1]
+            except IndexError:
+                stage = 'unknown'
 
             notification = args.get('notification', {})
             key = args.get('key', notification.get('object_name', ''))
@@ -39,6 +38,9 @@ def mqtt_status(stage=None):
             msg['event'] = 'start'
             msg['start'] = int(t1)
 
+            if helper_ is not None:
+                msg.extend(helper_(args))
+            
             publish.single(
                 f"choirless/{choir_id}/{song_id}/renderer/{stage}",
                 json.dumps(msg),

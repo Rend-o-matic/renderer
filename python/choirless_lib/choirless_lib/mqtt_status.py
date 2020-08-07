@@ -3,6 +3,7 @@ import json
 import os
 import time
 from pathlib import Path
+import uuid
 
 import paho.mqtt.publish as publish
 
@@ -29,6 +30,7 @@ def mqtt_status(helper=None):
             msg = {'choir_id': choir_id,
                    'song_id': song_id,
                    'stage': stage,
+                   'status_id': str(uuid.uuid4())
             }
             
             if stage in ['convert_format', 'calculate_alignment', 'trim_clip']:

@@ -15,15 +15,15 @@ def create_cos_client(args):
     :rtype: ibm_boto3.client
     """
 
+    # set the Cloud Object Storage endpoint
+    endpoint = args.get('endpoint', args.get('ENDPOINT',
+                        'https://s3.us.cloud-object-storage.appdomain.cloud'))
+    
     # if a Cloud Object Storage endpoint parameter was specified
     # make sure the URL contains the https:// scheme or the COS
     # client cannot connect
-    if args.get('endpoint') and not args['endpoint'].startswith('https://'):
-        args['endpoint'] = 'https://{}'.format(args['endpoint'])
-
-    # set the Cloud Object Storage endpoint
-    endpoint = args.get('endpoint',
-                        'https://s3.us.cloud-object-storage.appdomain.cloud')
+    if not endpoint.startswith('https://'):
+        endpoint = f'https://{endpoint}'
 
     # extract Cloud Object Storage service credentials
     cos_creds = args.get('__bx_creds', {}).get('cloud-object-storage', {})

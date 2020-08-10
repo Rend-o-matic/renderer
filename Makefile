@@ -12,6 +12,7 @@ PREVIEW_BUCKET_NAME ?= choirless-videos-preview
 FINAL_PARTS_BUCKET_NAME ?= choirless-videos-final-parts
 FINAL_BUCKET_NAME ?= choirless-videos-final
 STATUS_BUCKET_NAME ?= choirless-videos-status
+MISC_BUCKET_NAME ?= choirless-videos-misc
 
 # Namespace functions will be created int
 NAMESPACE_NAME ?= choirless
@@ -53,8 +54,12 @@ create-buckets:
 	ibmcloud cos create-bucket --bucket $(RAW_BUCKET_NAME) --ibm-service-instance-id $(COS_INSTANCE_NAME) --region $(COS_REGION)
 	ibmcloud cos create-bucket --bucket $(CONVERTED_BUCKET_NAME) --ibm-service-instance-id $(COS_INSTANCE_NAME) --region $(COS_REGION)
 	ibmcloud cos create-bucket --bucket $(TRIMMED_BUCKET_NAME) --ibm-service-instance-id $(COS_INSTANCE_NAME) --region $(COS_REGION)
+	ibmcloud cos create-bucket --bucket $(DEFINITION_BUCKET_NAME) --ibm-service-instance-id $(COS_INSTANCE_NAME) --region $(COS_REGION)
+	ibmcloud cos create-bucket --bucket $(FINAL_PARTS_BUCKET_NAME) --ibm-service-instance-id $(COS_INSTANCE_NAME) --region $(COS_REGION)
 	ibmcloud cos create-bucket --bucket $(PREVIEW_BUCKET_NAME) --ibm-service-instance-id $(COS_INSTANCE_NAME) --region $(COS_REGION)
 	ibmcloud cos create-bucket --bucket $(FINAL_BUCKET_NAME) --ibm-service-instance-id $(COS_INSTANCE_NAME) --region $(COS_REGION)
+	ibmcloud cos create-bucket --bucket $(STATUS_BUCKET_NAME) --ibm-service-instance-id $(COS_INSTANCE_NAME) --region $(COS_REGION)
+	ibmcloud cos create-bucket --bucket $(MISC_BUCKET_NAME) --ibm-service-instance-id $(COS_INSTANCE_NAME) --region $(COS_REGION)
 
 # Create and set namespace
 namespace:
@@ -82,6 +87,7 @@ package:
 	 --param preview_bucket $(PREVIEW_BUCKET_NAME) \
 	 --param final_bucket $(FINAL_BUCKET_NAME) \
 	 --param status_bucket $(STATUS_BUCKET_NAME)
+	 --param misc_bucket $(MISC_BUCKET_NAME)
 
 	# Bind COS instance to the package
 	ibmcloud fn service bind cloud-object-storage choirless --instance $(COS_INSTANCE_NAME)

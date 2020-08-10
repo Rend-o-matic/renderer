@@ -16,6 +16,8 @@ from choirless_lib import mqtt_status, create_signed_url, create_cos_client
 # first step to ensure we have all parts
 # then call process()
 def main(args):
+    
+    args['endpoint'] = args.get('endpoint', args.get('ENDPOINT'))
     cos = create_cos_client(args)
 
     if not cos:
@@ -74,6 +76,7 @@ def process(args):
 
     src_bucket = args['final_parts_bucket']
     dst_bucket = args['preview_bucket']
+    misc_bucket = args['misc_bucket']
 
     video_part_keys = args['video_part_keys']
     audio_part_keys = args['audio_part_keys']
@@ -100,6 +103,13 @@ def process(args):
                              geo,
                              dst_bucket)
     
+    get_misc_url = partial(create_signed_url,
+                            host,
+                            'GET',
+                            cos_api_key,
+                            cos_api_secret,
+                            geo,
+                            misc_bucket)
     ###
     ### Combine video and audio
     ###
@@ -124,6 +134,14 @@ def process(args):
             video = ffmpeg.input(video_url,
                                  seekable=0,
                                  thread_queue_size=64)
+
+        # Overlay the watermark
+        watermark_url = get_misc_url('choirless_watermark.png')
+        watermark = ffmpeg.input(watermark_url,
+                                 seekable=0)
+        video = video.overlay(watermark,
+                              x='W-w-20',
+                              y='H-h-20')
             
         # audio
         if len(audio_part_keys) > 1:

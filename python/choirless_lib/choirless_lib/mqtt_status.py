@@ -1,4 +1,3 @@
-## Signed URL support
 import json
 import os
 import time
@@ -7,6 +6,22 @@ import uuid
 
 import paho.mqtt.publish as publish
 
+
+def safe_publish(topic, msg, broker, timeout=5):
+    if not broker:
+        print("No MQTT broker configured")
+    else:
+        try:
+            hostname, port = broker.split(':')
+            return publish.single(topic,
+                                  json.dumps(msg),
+                                  hostname=hostname,
+                                  port=port,
+                                  timeout=timeout)
+        except Exception as e:
+            print("Could not send MQTT message:", e)
+    
+
 def mqtt_status(helper=None):
     helper_ = helper
     
@@ -14,6 +29,9 @@ def mqtt_status(helper=None):
         
         def wrapped_f(args):
 
+            # Get the broker to use
+            mqtt_broker = args.get('mqtt_broker')
+            
             # Get the stage from the current env
             stage = os.environ.get('__OW_ACTION_NAME')
             try:
@@ -35,8 +53,6 @@ def mqtt_status(helper=None):
             
             if stage in ['convert_format', 'calculate_alignment', 'trim_clip']:
                 msg['part_id'] = key_parts[2]
-        
-            mqtt_server, mqtt_port = args['mqtt_broker'].split(':')
 
             t1 = time.time()
             msg['event'] = 'start'
@@ -45,11 +61,10 @@ def mqtt_status(helper=None):
             if helper_ is not None:
                 msg.update(helper_(args))
             
-            publish.single(
+            safe_publish(
                 f"choirless/{choir_id}/{song_id}/renderer/{stage}",
-                json.dumps(msg),
-                hostname=mqtt_server,
-                port=int(mqtt_port)
+                msg,
+                mqtt_broker
             )
             
             result = method(args)
@@ -59,11 +74,10 @@ def mqtt_status(helper=None):
             msg['end'] = int(t2)
             msg['duration'] = int(t2-t1)
             
-            publish.single(
+            safe_publish(
                 f"choirless/{choir_id}/{song_id}/renderer/{stage}",
-                json.dumps(msg),
-                hostname=mqtt_server,
-                port=int(mqtt_port)
+                msg,
+                mqtt_broker,
             )
             
             return result

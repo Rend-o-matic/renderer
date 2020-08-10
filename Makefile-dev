@@ -137,7 +137,7 @@ snapshot:
 status:
 	ibmcloud fn action update choirless/status python/status.py
 
-sequences: trim_clip
+sequences: calc_and_trim
 
 # Calc alignment and Trim amd stitch
 calc_and_trim:

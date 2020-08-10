@@ -3,9 +3,18 @@ const boxjam = require('boxjam')
 const ibmCOS = require('ibm-cos-sdk')
 
 const main = async (opts) => {
-  // get the songid/choirId parameters
-  const songId = opts.songId
-  const choirId = opts.choirId
+  // look for a key in opts and pull songId and choidId from there
+  key = opts.notification ? opts.notification.object_name : opts.key
+  let choirId, songId
+  if (key != undefined) {
+    let parts = key.split("+")
+    choirId = parts[0]
+    songId = parts[1]
+  } else {
+    // get the songid/choirId parameters
+    choirId = opts.choirId
+    songId = opts.songId
+  }
   if (!songId || !choirId) {
     return { ok: false, message: 'missing parameters' }
   }
@@ -21,7 +30,7 @@ const main = async (opts) => {
   const center = opts.center || true
 
   // COS
-  opts.COS_ENDPOINT = opts.COS_ENDPOINT || opts.endpoint || 'https://s3.us.cloud-object-storage.appdomain.cloud'
+  opts.COS_ENDPOINT = opts.COS_ENDPOINT || opts.endpoint || 'https://s3.eu-gb.cloud-object-storage.appdomain.cloud'
   const cosCreds = opts.__bx_creds ? opts.__bx_creds['cloud-object-storage'] : undefined
   if (cosCreds) {
     opts.COS_API_KEY = opts.COS_API_KEY || cosCreds.apikey
@@ -103,8 +112,8 @@ const main = async (opts) => {
     console.log('output', JSON.stringify(output))
 
     // write the definition to a COS bucket
-    const key = [opts.choirId, opts.songId, 'auto'].join('+') + '.json'
-    await cos.putObject({ Bucket: opts.COS_BUCKET, Key: key, Body: JSON.stringify(output) }).promise()
+    const key = [choirId, songId, 'auto'].join('+') + '.json'
+    await cos.putObject({ Bucket: opts.definition_bucket, Key: key, Body: JSON.stringify(output) }).promise()
     console.log('written key', key)
     return { ok: true }
   } else {

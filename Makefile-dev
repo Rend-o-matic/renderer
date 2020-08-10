@@ -1,20 +1,20 @@
 # Cloud Object Storage instance name 
-COS_INSTANCE_NAME ?= cloud-object-storage-cb
+COS_INSTANCE_NAME ?= cos-choirless-dev
 COS_REGION ?= eu-gb
 COS_ENDPOINT = s3.private.eu-gb.cloud-object-storage.appdomain.cloud
 
 # Regional buckets in above Cloud Object Storage instance
-RAW_BUCKET_NAME ?= choirless-videos-raw
-CONVERTED_BUCKET_NAME ?= choirless-videos-converted
-TRIMMED_BUCKET_NAME ?= choirless-videos-trimmed
-DEFINITION_BUCKET_NAME ?= choirless-videos-definition
-PREVIEW_BUCKET_NAME ?= choirless-videos-preview
-FINAL_PARTS_BUCKET_NAME ?= choirless-videos-final-parts
-FINAL_BUCKET_NAME ?= choirless-videos-final
-STATUS_BUCKET_NAME ?= choirless-videos-status
+RAW_BUCKET_NAME ?= choirless-videos-raw-dev
+CONVERTED_BUCKET_NAME ?= choirless-videos-converted-dev
+TRIMMED_BUCKET_NAME ?= choirless-videos-trimmed-dev
+DEFINITION_BUCKET_NAME ?= choirless-videos-definition-dev
+PREVIEW_BUCKET_NAME ?= choirless-videos-preview-dev
+FINAL_PARTS_BUCKET_NAME ?= choirless-videos-final-parts-dev
+FINAL_BUCKET_NAME ?= choirless-videos-final-dev
+STATUS_BUCKET_NAME ?= choirless-videos-status-dev
 
 # Namespace functions will be created int
-NAMESPACE_NAME ?= choirless
+NAMESPACE_NAME ?= choirless-dev
 
 # Choirless API details
 CHOIRLESS_API_URL ?= https://choirless-api.eu-gb.mybluemix.net/

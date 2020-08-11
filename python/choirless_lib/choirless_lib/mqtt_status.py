@@ -72,18 +72,27 @@ def mqtt_status(helper=None):
                 t2 = time.time()
 
                 msg['event'] = 'end'
+                msg['end'] = int(t2)
+                msg['duration'] = int(t2-t1)
+                
+                safe_publish(
+                    f"choirless/{choir_id}/{song_id}/renderer/{stage}",
+                    msg,
+                    mqtt_broker,
+                )
+
             except Exception as e:
                 msg['event'] = 'error'
-                msg['error'] = str(e)
-                
-            msg['end'] = int(t2)
-            msg['duration'] = int(t2-t1)
-                
-            safe_publish(
-                f"choirless/{choir_id}/{song_id}/renderer/{stage}",
-                msg,
-                mqtt_broker,
-            )
+                msg['error'] = str(e)       
+                msg['end'] = int(t2)
+                msg['duration'] = int(t2-t1)
+
+                safe_publish(
+                    f"choirless/{choir_id}/{song_id}/renderer/{stage}",
+                    msg,
+                    mqtt_broker,
+                )
+                raise
             
             return result
 

@@ -78,6 +78,16 @@ def process(args):
     dst_bucket = args['preview_bucket']
     misc_bucket = args['misc_bucket']
 
+    # Download the definition file for this job
+    definition_bucket = args['definition_bucket']
+    definition_key = f'{choir_id}+{song_id}+{def_id}.json'
+    definition_object = cos.get_object(
+        Bucket=definition_bucket,
+        Key=definition_key,
+    )
+    definition = json.load(definition_object['Body'])
+    output_spec = definition['output']
+
     video_part_keys = args['video_part_keys']
     audio_part_keys = args['audio_part_keys']
 
@@ -135,13 +145,15 @@ def process(args):
                                  seekable=0,
                                  thread_queue_size=64)
 
-        # Overlay the watermark
-        watermark_url = get_misc_url('choirless_watermark.png')
-        watermark = ffmpeg.input(watermark_url,
-                                 seekable=0)
-        video = video.overlay(watermark,
-                              x='W-w-20',
-                              y='H-h-20')
+        # Overlay the watermark if present
+        watermark_file = output_spec.get('watermark')
+        if watermark_file:
+            watermark_url = get_misc_url(watermark_file)
+            watermark = ffmpeg.input(watermark_url,
+                                     seekable=0)
+            video = video.overlay(watermark,
+                                  x='W-w-20',
+                                  y='H-h-20')
             
         # audio
         if len(audio_part_keys) > 1:
@@ -165,6 +177,23 @@ def process(args):
         audio = audio.filter('loudnorm',
                              i=-14)
 
+        # Add reverb in if present
+        reverb_type = output_spec.get('reverb_type')
+        if reverb_type:
+            reverb_url = get_misc_url(f'{reverb_type}.wav')
+            reverb_pct = float(output_spec.get('reverb', 0.1))
+            if reverb_pct > 0:
+                reverb_part = ffmpeg.input(reverb_url,
+                                           seekable=0)
+                split_audio = audio.filter_multi_output('asplit')
+                reverb = ffmpeg.filter([split_audio[1], reverb_part],
+                                       'afir',
+                                       dry=10, wet=10)
+                audio = ffmpeg.filter([split_audio[0], reverb],
+                                    'amix',
+                                    inputs=2,
+                                    weights=f'{1-reverb_pct} {reverb_pct}')
+        
         output_key = f'{choir_id}+{song_id}+{def_id}-final.mp4'
         output_path = str(Path(tmpdir, output_key))
 

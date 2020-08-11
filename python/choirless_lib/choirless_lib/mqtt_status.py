@@ -16,7 +16,7 @@ def safe_publish(topic, msg, broker, timeout=5):
             return publish.single(topic,
                                   json.dumps(msg),
                                   hostname=hostname,
-                                  port=port,
+                                  port=int(port),
                                   keepalive=timeout)
         except Exception as e:
             print("Could not send MQTT message:", e)

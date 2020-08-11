@@ -17,7 +17,7 @@ def safe_publish(topic, msg, broker, timeout=5):
                                   json.dumps(msg),
                                   hostname=hostname,
                                   port=port,
-                                  timeout=timeout)
+                                  keepalive=timeout)
         except Exception as e:
             print("Could not send MQTT message:", e)
     
@@ -66,19 +66,33 @@ def mqtt_status(helper=None):
                 msg,
                 mqtt_broker
             )
-            
-            result = method(args)
-            t2 = time.time()
 
-            msg['event'] = 'end'
-            msg['end'] = int(t2)
-            msg['duration'] = int(t2-t1)
-            
-            safe_publish(
-                f"choirless/{choir_id}/{song_id}/renderer/{stage}",
-                msg,
-                mqtt_broker,
-            )
+            try:
+                result = method(args)
+                t2 = time.time()
+
+                msg['event'] = 'end'
+                msg['end'] = int(t2)
+                msg['duration'] = int(t2-t1)
+                
+                safe_publish(
+                    f"choirless/{choir_id}/{song_id}/renderer/{stage}",
+                    msg,
+                    mqtt_broker,
+                )
+
+            except Exception as e:
+                msg['event'] = 'error'
+                msg['error'] = str(e)       
+                msg['end'] = int(t2)
+                msg['duration'] = int(t2-t1)
+
+                safe_publish(
+                    f"choirless/{choir_id}/{song_id}/renderer/{stage}",
+                    msg,
+                    mqtt_broker,
+                )
+                raise
             
             return result
 

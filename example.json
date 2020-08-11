@@ -1,0 +1,29 @@
+{
+    "choir_id": "001jr0nG1EKeJr2W13rs3ZIZi42mi3fO",
+    "song_id": "001jxwlK1NkxRI0Y7T3S1jUSHW2Ndy5D",
+    "output": {
+        "size": [1080, 720],
+        "reverb": 0.1,
+        "reverb_type": "hall",
+        "panning": true,
+        "watermark": "choirless.png"
+    },
+    "inputs": [
+        {
+            "part_id": "001jxwsG3LoxlE25DCU52NVkNU4aci1f",
+            "position": ["20, 30"],
+            "size": [200, 300],
+            "volume": 0.2,
+            "panning": -0.15,
+            "offet": 0
+        },
+        {
+            "part_id": "001jxwsG3LoxlE25DCU52NVkNU4aci2b",
+            "position": ["22, 30"],
+            "size": [200, 300],
+            "volume": 1.0,
+            "panning": 0.3,
+            "offset": 230
+        }
+    ]
+}

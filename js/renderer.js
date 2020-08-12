@@ -25,7 +25,7 @@ const main = async (opts) => {
   const reverb = opts.reverb || 0.1
   const reverbType = opts.reverbType || 'hall'
   const panning = opts.panning || true
-  const watermark = opts.watermark || null
+  const watermark = opts.watermark || 'choirless_watermark.png'
   const margin = opts.margin || 10
   const center = opts.center || true
 

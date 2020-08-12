@@ -72,6 +72,7 @@ cos-auth:
 
 # Create the package
 package:
+	ibmcloud fn property set --namespace $(NAMESPACE_NAME)
 	ibmcloud fn package update choirless \
 	 --param CHOIRLESS_API_URL $(CHOIRLESS_API_URL) \
 	 --param CHOIRLESS_API_KEY $(CHOIRLESS_API_KEY) \
@@ -86,7 +87,7 @@ package:
 	 --param final_parts_bucket $(FINAL_PARTS_BUCKET_NAME) \
 	 --param preview_bucket $(PREVIEW_BUCKET_NAME) \
 	 --param final_bucket $(FINAL_BUCKET_NAME) \
-	 --param status_bucket $(STATUS_BUCKET_NAME)
+	 --param status_bucket $(STATUS_BUCKET_NAME) \
 	 --param misc_bucket $(MISC_BUCKET_NAME)
 
 	# Bind COS instance to the package

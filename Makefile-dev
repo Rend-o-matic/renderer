@@ -136,7 +136,7 @@ renderer_final:
 
 # Snapshot
 snapshot:
-	ibmcloud fn action update choirless/snapshot python/snapshot_smiler.py \
+	ibmcloud fn action update choirless/snapshot python/snapshot.py \
 	 --docker $(PYTHON_IMAGE) --timeout 600000 --memory 2048
 
 # Status report

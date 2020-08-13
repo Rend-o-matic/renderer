@@ -48,6 +48,7 @@ def main(args):
     video = stream.filter('fps', fps=25, round='up')
     video = video.filter('scale', 640, 480,
                          force_original_aspect_ratio='decrease')
+    video = video.filter('crop', 'trunc(iw/2)*2', 'trunc(ih/2)*2')
     audio = stream.audio
     audio = audio.filter('loudnorm',
                          i=-14,

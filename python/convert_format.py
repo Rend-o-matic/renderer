@@ -46,7 +46,8 @@ def main(args):
     
     stream = ffmpeg.input(get_input_url(key))
     video = stream.filter('fps', fps=25, round='up')
-    video = video.filter('scale', 640, -1)
+    video = video.filter('scale', 640, 480,
+                         force_original_aspect_ratio='decrease')
     audio = stream.audio
     audio = audio.filter('loudnorm',
                          i=-14,

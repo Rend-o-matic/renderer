@@ -163,9 +163,10 @@ def process(args):
                                        'afir',
                                        dry=10, wet=10)
                 audio = ffmpeg.filter([split_audio[0], reverb],
-                                    'amix',
-                                    inputs=2,
-                                    weights=f'{1-reverb_pct} {reverb_pct}')
+                                      'amix',
+                                      dropout_transition=180,
+                                      inputs=2,
+                                      weights=f'{1-reverb_pct} {reverb_pct}')
 
         # Output
         output_key = f'{choir_id}+{song_id}+{def_id}-final.mp4'

@@ -60,8 +60,9 @@ async def async_main(args):
     async with aiohttp.ClientSession(headers=headers) as session:
         tasks = []
         for row in rows:
-            tasks.append(call_child(session, args, run_id, row, rows_hash, 'audio'))
-            tasks.append(call_child(session, args, run_id, row, rows_hash, 'video'))
+            tasks.append(call_child(session, args, run_id, row, rows_hash, 'combined'))
+#            tasks.append(call_child(session, args, run_id, row, rows_hash, 'audio'))
+#            tasks.append(call_child(session, args, run_id, row, rows_hash, 'video'))
             
         await asyncio.gather(*tasks)
     t2 = time.time()

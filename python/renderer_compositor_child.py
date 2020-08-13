@@ -85,21 +85,39 @@ def main(args):
                              geo,
                              dst_bucket)
 
-    if compositor == 'video':
-        pipeline = gen_video_pipeline(choir_id, song_id, def_id, run_id,
-                                      input_specs, output_spec,
-                                      output_key,
-                                      row_num, rows,
-                                      get_input_url, get_output_url,
-                                      args)
+    video_pipeline = gen_video_pipeline(choir_id, song_id, def_id, run_id,
+                                        input_specs, output_spec,
+                                        output_key,
+                                        row_num, rows,
+                                        get_input_url, get_output_url,
+                                        args)
 
-    if compositor == 'audio':
-        pipeline = gen_audio_pipeline(choir_id, song_id, def_id, run_id,
-                                      input_specs, output_spec,
-                                      output_key,
-                                      row_num, rows,
-                                      get_input_url, get_output_url,
-                                      args)
+    audio_pipeline = gen_audio_pipeline(choir_id, song_id, def_id, run_id,
+                                        input_specs, output_spec,
+                                        output_key,
+                                        row_num, rows,
+                                        get_input_url, get_output_url,
+                                        args)
+
+    kwargs = {}
+    if 'duration' in args:
+        kwargs['t'] = int(args['duration'])
+
+    output_url = get_output_url(output_key)
+    
+    pipeline = ffmpeg.output(video_pipeline,
+                             audio_pipeline,
+                             output_url,
+                             format='nut',
+                             pix_fmt='yuv420p',
+                             acodec='pcm_s16le',
+                             vcodec='mpeg2video',
+                             method='PUT',
+                             seekable=0,
+                             qscale=1,
+                             qmin=1,
+                             **kwargs
+    )
     
     cmd = pipeline.compile()
     print("ffmpeg command to run: ", cmd)
@@ -170,7 +188,6 @@ def gen_video_pipeline(choir_id, song_id, def_id, run_id,
     # Main combination process
     video_inputs = []
     coords = []
-    output_url = get_output_url(output_key)
 
     for spec in row_input_specs:
         # Get the part spec and input
@@ -211,23 +228,7 @@ def gen_video_pipeline(choir_id, song_id, def_id, run_id,
                                                x,
                                                y)
 
-    kwargs = {}
-    if 'duration' in args:
-        kwargs['t'] = int(args['duration'])
-
-    pipeline = ffmpeg.output(video_pipeline,
-                             output_url,
-                             format='nut',
-                             pix_fmt='yuv420p',
-                             vcodec='mpeg2video',
-                             method='PUT',
-                             seekable=0,
-                             qscale=1,
-                             qmin=1,
-                             **kwargs
-    )
-    
-    return pipeline
+    return video_pipeline
 
 
 def gen_audio_pipeline(choir_id, song_id, def_id, run_id,
@@ -251,7 +252,6 @@ def gen_audio_pipeline(choir_id, song_id, def_id, run_id,
     # Main combination process
     audio_inputs = []
     layouts = []
-    output_url = get_output_url(output_key)
 
     for spec in row_input_specs:
         # Get the part spec and input
@@ -277,19 +277,4 @@ def gen_audio_pipeline(choir_id, song_id, def_id, run_id,
         
     audio_pipeline = ffmpeg.filter(audio_inputs, 'amix', inputs=len(audio_inputs))
 
-    kwargs = {}
-    if 'duration' in args:
-        kwargs['t'] = int(args['duration'])
-
-    # XXX Add reverb in
-    
-    pipeline = ffmpeg.output(audio_pipeline,
-                             output_url,
-                             format='nut',
-                             acodec='pcm_s16le',
-                             method='PUT',
-                             seekable=0,
-                             **kwargs
-    )
-    
-    return pipeline
+    return audio_pipeline

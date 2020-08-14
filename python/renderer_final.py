@@ -38,27 +38,19 @@ def main(args):
         Bucket=src_bucket,
         Prefix=key_prefix
     )
-    existing_part_keys = [ x['Key'] for x in contents.get('Contents', []) \
+    row_keys = [ x['Key'] for x in contents.get('Contents', []) \
                            if x['Size'] > 0 ]
 
-    video_part_keys = [ x for x in existing_part_keys if '+video-' in x ]
-    audio_part_keys = [ x for x in existing_part_keys if '+audio-' in x ]
-
     # Sort to make sure we are in correct order
-    video_part_keys.sort(key=lambda x: int(parse_key(x)[4]))
-    audio_part_keys.sort(key=lambda x: int(parse_key(x)[4]))
+    row_keys.sort(key=lambda x: int(parse_key(x)[4]))
+    row_keys.sort(key=lambda x: int(parse_key(x)[4]))
 
     # Calc hash of found parts to make sure we have all, if not abort
-    if calc_hash_of_keys(video_part_keys) != rows_hash:
-        ret = {'status': 'missing video parts'}
+    if calc_hash_of_keys(row_keys) != rows_hash:
+        ret = {'status': 'missing rows'}
         return ret
 
-    if calc_hash_of_keys(audio_part_keys) != rows_hash:
-        ret = {'status': 'missing audio parts'}
-        return ret
-
-    args['video_part_keys'] = video_part_keys
-    args['audio_part_keys'] = audio_part_keys
+    args['row_keys'] = row_keys
     return process(args)
 
 @mqtt_status()
@@ -88,8 +80,7 @@ def process(args):
     definition = json.load(definition_object['Body'])
     output_spec = definition['output']
 
-    video_part_keys = args['video_part_keys']
-    audio_part_keys = args['audio_part_keys']
+    row_keys = args['row_keys']
 
     geo = args['geo']
     host = args['endpoint']
@@ -105,14 +96,6 @@ def process(args):
                             geo,
                             src_bucket)
     
-    get_output_url = partial(create_signed_url,
-                             host,
-                             'PUT',
-                             cos_api_key,
-                             cos_api_secret,
-                             geo,
-                             dst_bucket)
-    
     get_misc_url = partial(create_signed_url,
                             host,
                             'GET',
@@ -127,23 +110,31 @@ def process(args):
     # Create a temp dir for our files to use
     with tempfile.TemporaryDirectory() as tmpdir:
         # video
-        if len(video_part_keys) > 1:
+        if len(row_keys) > 1:
             # Multiple video parts
             video_parts = []
-            for video_part_key in video_part_keys:
-                video_url = get_input_url(video_part_key)
-                video_part = ffmpeg.input(video_url,
-                                          seekable=0,
-                                          thread_queue_size=64)
-                video_parts.append(video_part)
+            audio_parts = []
+            for row_key in row_keys:
+                row_url = get_input_url(row_key)
+                row_part = ffmpeg.input(row_url,
+                                        seekable=0,
+                                        thread_queue_size=64)
+                video_parts.append(row_part.video)
+                audio_parts.append(row_part.audio)
+                
             video = ffmpeg.filter(video_parts, 'vstack',
                                   inputs=len(video_parts))
+            audio = ffmpeg.filter(audio_parts,
+                                  'amix',
+                                  inputs=len(audio_parts))
         else:
             # Just a single video part
-            video_url = get_input_url(video_part_keys[0])
-            video = ffmpeg.input(video_url,
-                                 seekable=0,
-                                 thread_queue_size=64)
+            row_url = get_input_url(row_keys[0])
+            row_part = ffmpeg.input(row_url,
+                                    seekable=0,
+                                    thread_queue_size=64)
+            video = row_part.video
+            audio = row_part.audio
 
         # Overlay the watermark if present
         watermark_file = output_spec.get('watermark')
@@ -154,26 +145,8 @@ def process(args):
             video = video.overlay(watermark,
                                   x='W-w-20',
                                   y='H-h-20')
-            
-        # audio
-        if len(audio_part_keys) > 1:
-            # Multiple audio parts
-            audio_parts = []
-            for audio_part_key in audio_part_keys:
-                audio_url = get_input_url(audio_part_key)
-                audio_part = ffmpeg.input(audio_url,
-                                          seekable=0,
-                                          thread_queue_size=64)
-                audio_parts.append(audio_part)
-            audio = ffmpeg.filter(audio_parts,
-                                  'amix',
-                                  inputs=len(audio_parts))
-        else:
-            # Just a single audio part
-            audio_url = get_input_url(audio_part_keys[0])
-            audio = ffmpeg.input(audio_url,
-                                 seekable=0,
-                                 thread_queue_size=64)
+             
+        # Normalise the audio loudness
         audio = audio.filter('loudnorm',
                              i=-14)
 
@@ -190,10 +163,12 @@ def process(args):
                                        'afir',
                                        dry=10, wet=10)
                 audio = ffmpeg.filter([split_audio[0], reverb],
-                                    'amix',
-                                    inputs=2,
-                                    weights=f'{1-reverb_pct} {reverb_pct}')
-        
+                                      'amix',
+                                      dropout_transition=180,
+                                      inputs=2,
+                                      weights=f'{1-reverb_pct} {reverb_pct}')
+
+        # Output
         output_key = f'{choir_id}+{song_id}+{def_id}-final.mp4'
         output_path = str(Path(tmpdir, output_key))
 

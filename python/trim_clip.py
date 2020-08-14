@@ -44,11 +44,12 @@ def main(args):
 
     kwargs = {}
 
-    stream = ffmpeg.input(get_input_url(key))
+    stream = ffmpeg.input(get_input_url(key),
+                          ss=offset)
     pipeline = ffmpeg.output(stream,
                              get_output_url(output_key),
-                             c='copy',
-                             ss=offset,
+                             vcodec='libx264',
+                             acodec='pcm_f32le',
                              format='nut',
                              method='PUT',
                              seekable=0)

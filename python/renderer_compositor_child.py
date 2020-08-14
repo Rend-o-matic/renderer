@@ -238,7 +238,7 @@ def gen_audio_pipeline(choir_id, song_id, def_id, run_id,
                        get_input_url, get_output_url,
                        args):
     
-    # Calculate the max row lenght, needed for volume compensation
+    # Calculate the max row length, needed for volume compensation
     # on uneven rows
     max_row_len = 0
     for r in rows:

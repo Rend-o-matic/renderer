@@ -4,10 +4,10 @@ const ibmCOS = require('ibm-cos-sdk')
 
 const main = async (opts) => {
   // look for a key in opts and pull songId and choidId from there
-  key = opts.notification ? opts.notification.object_name : opts.key
+  const key = opts.notification ? opts.notification.object_name : opts.key
   let choirId, songId
-  if (key != undefined) {
-    let parts = key.split("+")
+  if (key !== undefined) {
+    const parts = key.split('+')
     choirId = parts[0]
     songId = parts[1]
   } else {
@@ -64,18 +64,20 @@ const main = async (opts) => {
     const rectangles = []
     for (var i in response.parts) {
       const p = response.parts[i]
-      if (!p.aspectRatio) {
-        p.aspectRatio = '640:480'
+      if (!p.hidden) {
+        if (!p.aspectRatio) {
+          p.aspectRatio = '640:480'
+        }
+        const ar = p.aspectRatio.split(':')
+        const w = parseInt(ar[0])
+        const h = parseInt(ar[1])
+        const obj = {
+          id: p.partId,
+          width: w,
+          height: h
+        }
+        rectangles.push(obj)
       }
-      const ar = p.aspectRatio.split(':')
-      const w = parseInt(ar[0])
-      const h = parseInt(ar[1])
-      const obj = {
-        id: p.partId,
-        width: w,
-        height: h
-      }
-      rectangles.push(obj)
     }
     console.log('rectangles', rectangles)
 

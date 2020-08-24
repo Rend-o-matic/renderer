@@ -132,6 +132,7 @@ def main(args):
                              method='PUT',
                              preset='slow',
                              seekable=0,
+                             r=25,
                              ac=1,
                              **kwargs)
 

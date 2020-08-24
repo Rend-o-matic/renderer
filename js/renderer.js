@@ -4,10 +4,10 @@ const ibmCOS = require('ibm-cos-sdk')
 
 const main = async (opts) => {
   // look for a key in opts and pull songId and choidId from there
-  key = opts.notification ? opts.notification.object_name : opts.key
+  const key = opts.notification ? opts.notification.object_name : opts.key
   let choirId, songId
-  if (key != undefined) {
-    let parts = key.split("+")
+  if (key !== undefined) {
+    const parts = key.split('+')
     choirId = parts[0]
     songId = parts[1]
   } else {
@@ -62,6 +62,7 @@ const main = async (opts) => {
   // turn the song parts in to an array of rectangle objects
   if (response.ok && response.parts.length > 0) {
     const rectangles = []
+    const hiddenParts = []
     for (var i in response.parts) {
       const p = response.parts[i]
       if (!p.aspectRatio) {
@@ -75,13 +76,20 @@ const main = async (opts) => {
         width: w,
         height: h
       }
-      rectangles.push(obj)
+      // split into two arrays:
+      // - rectangles - is passed to BoxJam
+      // - hiddenParts - audio only so added in without position later
+      if (!p.hidden) {
+        rectangles.push(obj)
+      } else {
+        hiddenParts.push(obj)
+      }
     }
     console.log('rectangles', rectangles)
 
     // boxjam
     const container = { width: width, height: height }
-    const adjustedRectangles = boxjam(rectangles, container, margin, center)
+    const adjustedRectangles = boxjam(rectangles, container, margin, center).concat(hiddenParts)
     console.log('boxjam says', adjustedRectangles)
 
     // construct output JSON
@@ -98,15 +106,22 @@ const main = async (opts) => {
       inputs: adjustedRectangles.map((r) => {
         // calculate stereo pan from where the middle of the video overlay
         // pan goes from -1 (left) to 0 (centre) to 1 (right)
-        const pan = (2 * ((r.x + r.width / 2) / width) - 1)
-        return {
+        const retval = {
           part_id: r.id,
-          position: [r.x, r.y],
           size: [r.width, r.height],
           volume: 1.0,
-          panning: pan,
+          panning: 0,
           offset: 0
         }
+        // if an 'x' coordinate is present, the video is visible and needs
+        // to be positioned and possibly have audio panned left/right
+        if (typeof r.x !== 'undefined') {
+          retval.position = [r.x, r.y]
+          if (panning) {
+            retval.pan = (2 * ((r.x + r.width / 2) / width) - 1)
+          }
+        }
+        return retval
       })
     }
     console.log('output', JSON.stringify(output))

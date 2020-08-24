@@ -2,6 +2,11 @@ const axios = require('axios').default
 const boxjam = require('boxjam')
 const ibmCOS = require('ibm-cos-sdk')
 
+// reverse the order of a string
+const reverseString = (str) => {
+  return str.split('').reverse().join('')
+}
+
 const main = async (opts) => {
   // look for a key in opts and pull songId and choidId from there
   const key = opts.notification ? opts.notification.object_name : opts.key
@@ -85,6 +90,18 @@ const main = async (opts) => {
         hiddenParts.push(obj)
       }
     }
+
+    // sort the rectangles into a deterministic random order (i.e not totally random, but
+    // and not in time-of-recording order)
+    rectangles.sort(function (a, b) {
+      // sort by the reverse of the id - the start of the id is "time"
+      // so reversing it gets you the random stuff at the front of the string
+      const ida = reverseString(a.id)
+      const idb = reverseString(b.id)
+      if (ida < idb) return -1
+      if (ida > idb) return 1
+      return 0
+    })
     console.log('rectangles', rectangles)
 
     // boxjam

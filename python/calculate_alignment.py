@@ -98,12 +98,17 @@ def main(args):
     times1, data1, tempo1, beats1 = process_signal(x1, fs1)
     print("Tempo1:", tempo1)
 
-    # Actually calculate the offset
-    offset, error = find_offset(data0, data1)
-    print(f"Offset: {offset} Error: {error}")
+    # Check we have a tempo, if not say offset is zero
+    if tempo0 > 0 and tempo1 > 0:
+    
+        # Actually calculate the offset
+        offset, error = find_offset(data0, data1)
+        print(f"Offset: {offset} Error: {error}")
 
-    # Convert offset to milliseconds
-    offset = int(((offset * HOP_LENGTH) / SAMPLE_RATE) * 1000)
+        # Convert offset to milliseconds
+        offset = int(((offset * HOP_LENGTH) / SAMPLE_RATE) * 1000)
+    else:
+        offset, error = 0, 0
 
     # If the offset is too great, assume we failed and fallback to zero
     if offset > 700:

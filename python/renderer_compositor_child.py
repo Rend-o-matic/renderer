@@ -54,13 +54,13 @@ def main(args):
     # Calculate number of rows
     rows = set()
     for spec in input_specs:
-        x, y = spec['position']
+        x, y = spec.get('position', [-1,-1])
         rows.add(y)
     rows = sorted(rows)
     num_rows = len(rows)
 
     # The output key
-    output_key = f"{choir_id}+{song_id}+{def_id}+{run_id}+{compositor}-{row_num}-{rows_hash}.nut"
+    output_key = f"{choir_id}+{song_id}+{def_id}+{run_id}+{row_num}@{rows_hash}.nut"
     
     # Create partial functions to get signed urls for input / output
     geo = args['geo']
@@ -85,12 +85,15 @@ def main(args):
                              geo,
                              dst_bucket)
 
-    video_pipeline = gen_video_pipeline(choir_id, song_id, def_id, run_id,
-                                        input_specs, output_spec,
-                                        output_key,
-                                        row_num, rows,
-                                        get_input_url, get_output_url,
-                                        args)
+    streams_and_filename = []
+    if row_num != -1:
+        video_pipeline = gen_video_pipeline(choir_id, song_id, def_id, run_id,
+                                            input_specs, output_spec,
+                                            output_key,
+                                            row_num, rows,
+                                            get_input_url, get_output_url,
+                                            args)
+        streams_and_filename.append(video_pipeline)
 
     audio_pipeline = gen_audio_pipeline(choir_id, song_id, def_id, run_id,
                                         input_specs, output_spec,
@@ -98,16 +101,19 @@ def main(args):
                                         row_num, rows,
                                         get_input_url, get_output_url,
                                         args)
+    streams_and_filename.append(audio_pipeline)
 
     kwargs = {}
     if 'duration' in args:
         kwargs['t'] = int(args['duration'])
 
     output_url = get_output_url(output_key)
+    streams_and_filename.append(output_url)
     
-    pipeline = ffmpeg.output(video_pipeline,
-                             audio_pipeline,
-                             output_url,
+    pipeline = ffmpeg.output(*streams_and_filename,
+#                             video_pipeline,
+#                             audio_pipeline,
+#                             output_url,
                              format='nut',
                              pix_fmt='yuv420p',
                              acodec='pcm_s16le',
@@ -139,7 +145,7 @@ def main(args):
 
 def specs_for_row(specs, row):
     for spec in specs:
-        x, y = spec['position']
+        x, y = spec.get('position', [-1, -1])
         if y == row:
             yield spec
 
@@ -147,6 +153,8 @@ def calc_bounding_box(specs):
     top = np.inf
     bottom = -np.inf
     for spec in specs:
+        if not 'position' in spec:
+            continue
         x, y = spec['position']
         width, height = spec['size']
         if y < top:

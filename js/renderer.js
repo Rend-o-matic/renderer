@@ -66,6 +66,7 @@ const main = async (opts) => {
 
   // turn the song parts in to an array of rectangle objects
   if (response.ok && response.parts.length > 0) {
+    const partMap = {}
     const rectangles = []
     const hiddenParts = []
     for (var i in response.parts) {
@@ -89,6 +90,12 @@ const main = async (opts) => {
       } else {
         hiddenParts.push(obj)
       }
+
+      // add to part map - to allow quick lookup of offset by partId
+      if (typeof p.offset !== 'number') {
+        p.offset = 0
+      }
+      partMap[p.partId] = p
     }
 
     // sort the rectangles into a deterministic random order (i.e not totally random, but
@@ -128,7 +135,7 @@ const main = async (opts) => {
           size: [r.width, r.height],
           volume: 1.0,
           panning: 0,
-          offset: 0
+          offset: partMap[r.id].offset
         }
         // if an 'x' coordinate is present, the video is visible and needs
         // to be positioned and possibly have audio panned left/right

@@ -115,6 +115,24 @@ def main(args):
         print(f"Offset was too great ({offset}) so falling back to zero")
         offset = 0
 
+    # Save the offest to the API so we can trim on it later
+    try:
+        api_url = args['CHOIRLESS_API_URL']
+        api_key = args['CHOIRLESS_API_KEY']
+
+        params = {'apikey': api_key}
+        payload = {'choirId': choir_id,
+                   'songId': song_id,
+                   'partId': part_id,
+                   'offset': offset}
+        resp = requests.post(urljoin(api_url, 'choir/songpart'),
+                             params=params,
+                             json=payload)
+        resp.raise_for_status()
+
+    except Exception as e:
+        print(f"Could not store offset in API: choidId {choir_id} songId {song_id} partId {part_id} offset {offset} error: {e}")
+
     ret = {"offset":  offset,
            "err": error,
            "key": rendition_key,

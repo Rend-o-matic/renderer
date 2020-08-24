@@ -47,7 +47,7 @@ async def async_main(args):
     # Calculate number of rows
     rows = set()
     for spec in input_specs:
-        x, y = spec['position']
+        x, y = spec.get('position', [-1, -1])
         rows.add(y)
     rows = sorted(rows)
     num_rows = len(rows)

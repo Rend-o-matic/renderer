@@ -115,11 +115,13 @@ def process(args):
             video_parts = []
             audio_parts = []
             for row_key in row_keys:
+                _, _, _, _, row_num, _ = parse_key(row_key)
                 row_url = get_input_url(row_key)
                 row_part = ffmpeg.input(row_url,
                                         seekable=0,
                                         thread_queue_size=64)
-                video_parts.append(row_part.video)
+                if row_num != -1:
+                    video_parts.append(row_part.video)
                 audio_parts.append(row_part.audio)
                 
             video = ffmpeg.filter(video_parts, 'vstack',
@@ -129,16 +131,21 @@ def process(args):
                                   inputs=len(audio_parts))
         else:
             # Just a single video part
-            row_url = get_input_url(row_keys[0])
+            row_key = row_keys[0]
+            _, _, _, _, row_num, _ = parse_key(row_key)
+            row_url = get_input_url(row_key)
             row_part = ffmpeg.input(row_url,
                                     seekable=0,
                                     thread_queue_size=64)
-            video = row_part.video
+            if row_num != -1:
+                video = row_part.video
+            else:
+                video = None
             audio = row_part.audio
 
         # Overlay the watermark if present
         watermark_file = output_spec.get('watermark')
-        if watermark_file:
+        if watermark_file and video:
             watermark_url = get_misc_url(watermark_file)
             watermark = ffmpeg.input(watermark_url,
                                      seekable=0)
@@ -147,8 +154,8 @@ def process(args):
                                   y='H-h-20')
              
         # Normalise the audio loudness
-        audio = audio.filter('loudnorm',
-                             i=-14)
+#        audio = audio.filter('loudnorm',
+#                             i=-14)
 
         # Add reverb in if present
         reverb_type = output_spec.get('reverb_type')
@@ -178,10 +185,17 @@ def process(args):
 
         if 'loglevel' in args:
             kwargs['v'] = args['loglevel']
-    
-        pipeline = ffmpeg.output(audio,
-                                 video,
-                                 output_path,
+
+        streams_and_filename = []
+        streams_and_filename.append(audio)
+        if video:
+            streams_and_filename.append(video)
+        streams_and_filename.append(output_path)
+
+        pipeline = ffmpeg.output(*streams_and_filename,
+#                                 audio,
+#                                 video,
+#                                 output_path,
                                  pix_fmt='yuv420p',
                                  vcodec='libx264',
                                  preset='veryfast',
@@ -207,8 +221,8 @@ def process(args):
 
 def parse_key(key):
     choir_id, song_id, def_id, run_id, section_id = Path(key).stem.split('+')
-    renderer, row_num, rows_hash = section_id.split('-')
-    return choir_id, song_id, def_id, run_id, row_num, rows_hash
+    row_num, rows_hash = section_id.split('@')
+    return choir_id, song_id, def_id, run_id, int(row_num), rows_hash
 
 def calc_hash_of_keys(keys):
     rows = [ int(parse_key(x)[4]) for x in keys ]

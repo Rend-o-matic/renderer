@@ -43,7 +43,6 @@ def main(args):
 
     # Sort to make sure we are in correct order
     row_keys.sort(key=lambda x: int(parse_key(x)[4]))
-    row_keys.sort(key=lambda x: int(parse_key(x)[4]))
 
     # Calc hash of found parts to make sure we have all, if not abort
     if calc_hash_of_keys(row_keys) != rows_hash:

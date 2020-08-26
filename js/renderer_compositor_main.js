@@ -37,7 +37,7 @@ const main = async (opts) => {
 
     // Calculate the hash of our rows
     let rows_str = rows.join("-")
-    let rows_hash = crypto.createHash('sha1', rows_str).digest('hex').slice(0,8)
+    let rows_hash = crypto.createHash('sha1').update(rows_str).digest('hex').slice(0,8)
     let run_id = uuidv4().slice(0,8)
 
     // Invoke all the child actions

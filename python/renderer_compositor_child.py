@@ -266,12 +266,12 @@ def process_spec(part_url, spec):
         audio = audio.filter('atrim',
                              start=offset)
     audio = audio.filter('asetpts', 'PTS-STARTPTS')
-    panning = float(spec.get('panning', 0))
+    pan = float(spec.get('pan', 0))
     volume = float(spec.get('volume', 1))
     audio = audio.filter('volume',
                          volume=volume)
     audio = audio.filter('stereotools',
-                         mpan=panning)
+                         mpan=pan)
 
     return video, audio
 

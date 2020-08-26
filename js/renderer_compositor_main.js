@@ -32,7 +32,9 @@ const main = async (opts) => {
 	let [x, y] = spec.position || [-1, -1]
 	rows.add(y)
     })
-    rows = Array.from(rows).sort()
+    rows = Array.from(rows)
+    rows.sort((a,b) => parseInt(a) - parseInt(b))
+
     let num_rows = rows.length
 
     // Calculate the hash of our rows

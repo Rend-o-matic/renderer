@@ -13,6 +13,7 @@ def main(args):
     notification = args.get('notification', {})
     key = notification.get('object_name', args['key'])
     bucket = notification.get('bucket_name', args['preview_bucket'])
+    dst_bucket = args.get('dst_bucket', bucket)
 
     if key.endswith(".jpg"):
         return {}
@@ -37,7 +38,7 @@ def main(args):
                              cos_api_key,
                              cos_api_secret,
                              geo,
-                             bucket)
+                             dst_bucket)
 
     output_key = str(Path(key).with_suffix('.jpg'))
 

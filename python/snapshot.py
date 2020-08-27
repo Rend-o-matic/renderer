@@ -1,12 +1,7 @@
-import io
-import json
-import os
-import librosa
-import numpy as np
-import tempfile
 from pathlib import Path
+from functools import partial
 
-from choirless_lib import create_cos_client
+from choirless_lib import create_signed_url
 
 import ffmpeg
 
@@ -15,35 +10,47 @@ SAMPLE_RATE = 44100
 
 def main(args):
 
-    cos = create_cos_client(args)
-
-    if not cos:
-        raise ValueError(f"could not create COS instance")
-
     notification = args.get('notification', {})
-    key = args.get('key', notification.get('object_name', ''))
-
-    bucket = args['preview_bucket']
+    key = notification.get('object_name', args['key'])
+    bucket = notification.get('bucket_name', args['preview_bucket'])
 
     if key.endswith(".jpg"):
         return {}
 
-    # Create a temp dir for our files to use
-    with tempfile.TemporaryDirectory() as tmpdir:
+    geo = args['geo']
+    host = args.get('endpoint', args.get('ENDPOINT'))
+    cos_hmac_keys = args['__bx_creds']['cloud-object-storage']['cos_hmac_keys']
+    cos_api_key = cos_hmac_keys['access_key_id']
+    cos_api_secret = cos_hmac_keys['secret_access_key']
 
-        # download file to temp dir
-        file_path = Path(tmpdir, key)
-        new_path = file_path.with_name(f'{file_path.stem}.jpg')
+    get_input_url = partial(create_signed_url,
+                            host,
+                            'GET',
+                            cos_api_key,
+                            cos_api_secret,
+                            geo,
+                            bucket)
 
-        cos.download_file(bucket, key, str(file_path))
+    get_output_url = partial(create_signed_url,
+                             host,
+                             'PUT',
+                             cos_api_key,
+                             cos_api_secret,
+                             geo,
+                             bucket)
 
-        stream = ffmpeg.input(str(file_path))
-        out = ffmpeg.output(stream, str(new_path), **{'vframes': 1})
-        stdout, stderr = out.run()
+    output_key = str(Path(key).with_suffix('.jpg'))
 
-        cos.upload_file(str(new_path), bucket, str(new_path.name))
+    stream = ffmpeg.input(get_input_url(key),
+                          seekable=0)
+    out = ffmpeg.output(stream,
+                        get_output_url(output_key),
+                        seekable=0,
+                        format='singlejpeg',
+                        vframes=1)
+    stdout, stderr = out.run()
 
-        ret = {"status": "ok",
-               "snapshot_key": str(new_path.name)}
+    ret = {"status": "ok",
+           "snapshot_key": output_key}
 
-        return ret
+    return ret

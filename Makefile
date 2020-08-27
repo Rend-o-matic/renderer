@@ -6,12 +6,12 @@ COS_ENDPOINT = s3.private.eu-gb.cloud-object-storage.appdomain.cloud
 # Regional buckets in above Cloud Object Storage instance
 RAW_BUCKET_NAME ?= choirless-videos-raw
 CONVERTED_BUCKET_NAME ?= choirless-videos-converted
-TRIMMED_BUCKET_NAME ?= choirless-videos-trimmed
 DEFINITION_BUCKET_NAME ?= choirless-videos-definition
 PREVIEW_BUCKET_NAME ?= choirless-videos-preview
 FINAL_PARTS_BUCKET_NAME ?= choirless-videos-final-parts
 FINAL_BUCKET_NAME ?= choirless-videos-final
 STATUS_BUCKET_NAME ?= choirless-videos-status
+SNAPSHOTS_BUCKET_NAME ?= choirless-videos-snapshots
 MISC_BUCKET_NAME ?= choirless-videos-misc
 
 # Namespace functions will be created int
@@ -53,12 +53,12 @@ clean:
 create-buckets:
 	ibmcloud cos create-bucket --bucket $(RAW_BUCKET_NAME) --ibm-service-instance-id $(COS_INSTANCE_NAME) --region $(COS_REGION)
 	ibmcloud cos create-bucket --bucket $(CONVERTED_BUCKET_NAME) --ibm-service-instance-id $(COS_INSTANCE_NAME) --region $(COS_REGION)
-	ibmcloud cos create-bucket --bucket $(TRIMMED_BUCKET_NAME) --ibm-service-instance-id $(COS_INSTANCE_NAME) --region $(COS_REGION)
 	ibmcloud cos create-bucket --bucket $(DEFINITION_BUCKET_NAME) --ibm-service-instance-id $(COS_INSTANCE_NAME) --region $(COS_REGION)
 	ibmcloud cos create-bucket --bucket $(FINAL_PARTS_BUCKET_NAME) --ibm-service-instance-id $(COS_INSTANCE_NAME) --region $(COS_REGION)
 	ibmcloud cos create-bucket --bucket $(PREVIEW_BUCKET_NAME) --ibm-service-instance-id $(COS_INSTANCE_NAME) --region $(COS_REGION)
 	ibmcloud cos create-bucket --bucket $(FINAL_BUCKET_NAME) --ibm-service-instance-id $(COS_INSTANCE_NAME) --region $(COS_REGION)
 	ibmcloud cos create-bucket --bucket $(STATUS_BUCKET_NAME) --ibm-service-instance-id $(COS_INSTANCE_NAME) --region $(COS_REGION)
+	ibmcloud cos create-bucket --bucket $(SNAPSHOTS_BUCKET_NAME) --ibm-service-instance-id $(COS_INSTANCE_NAME) --region $(COS_REGION)
 	ibmcloud cos create-bucket --bucket $(MISC_BUCKET_NAME) --ibm-service-instance-id $(COS_INSTANCE_NAME) --region $(COS_REGION)
 
 # Create and set namespace
@@ -83,11 +83,11 @@ package:
 	 --param definition_bucket $(DEFINITION_BUCKET_NAME) \
 	 --param raw_bucket $(RAW_BUCKET_NAME) \
 	 --param converted_bucket $(CONVERTED_BUCKET_NAME) \
-	 --param trimmed_bucket $(TRIMMED_BUCKET_NAME) \
 	 --param final_parts_bucket $(FINAL_PARTS_BUCKET_NAME) \
 	 --param preview_bucket $(PREVIEW_BUCKET_NAME) \
 	 --param final_bucket $(FINAL_BUCKET_NAME) \
 	 --param status_bucket $(STATUS_BUCKET_NAME) \
+	 --param snapshots_bucket $(SNAPSHOTS_BUCKET_NAME) \
 	 --param misc_bucket $(MISC_BUCKET_NAME)
 
 	# Bind COS instance to the package
@@ -96,7 +96,7 @@ package:
 # Actions
 actions: convert_format calculate_alignment trim_clip \
 	 renderer renderer_compositor_main renderer_compositor_child renderer_final \
-	 snapshot
+	 snapshot delete_handler
 
 # Convert format
 convert_format:
@@ -137,21 +137,27 @@ renderer_final:
 # Snapshot
 snapshot:
 	ibmcloud fn action update choirless/snapshot python/snapshot.py \
-	 --docker $(PYTHON_IMAGE) --timeout 600000 --memory 2048
+	 --docker $(PYTHON_IMAGE) --memory 2048
 
 # Status report
 status:
 	ibmcloud fn action update choirless/status python/status.py
 
-sequences: calc_and_trim
+# Delete handler
+delete_handler:
+	ibmcloud fn action update choirless/delete_handler js/delete_handler.js \
+	 --docker $(NODEJS_IMAGE)
 
-# Calc alignment and Trim amd stitch
-calc_and_trim:
-	ibmcloud fn action update choirless/calc_and_trim --sequence choirless/calculate_alignment,choirless/trim_clip
+sequences: calc_and_render
+
+# Calc alignment and kick of render of json definition
+calc_and_render:
+	ibmcloud fn action update choirless/calc_and_render --sequence choirless/calculate_alignment,choirless/renderer
 
 triggers: bucket_raw_upload_trigger bucket_converted_upload_trigger \
-	  bucket_trimmed_upload_trigger bucket_definition_upload_trigger \
-	  bucket_final_parts_upload_trigger bucket_preview_upload_trigger
+	  bucket_definition_upload_trigger \
+	  bucket_final_parts_upload_trigger bucket_preview_upload_trigger \
+	  bucket_raw_delete_trigger
 
 # Upload to raw bucket
 bucket_raw_upload_trigger:
@@ -161,12 +167,7 @@ bucket_raw_upload_trigger:
 # Upload to converted bucket
 bucket_converted_upload_trigger:
 	ibmcloud fn trigger create bucket_converted_upload_trigger --feed /whisk.system/cos/changes \
-	 --param bucket $(CONVERTED_BUCKET_NAME) --param event_types write
-
-# Upload to trimmed bucket
-bucket_trimmed_upload_trigger:
-	ibmcloud fn trigger create bucket_trimmed_upload_trigger --feed /whisk.system/cos/changes \
-	 --param bucket $(TRIMMED_BUCKET_NAME) --param event_types write
+	 --param bucket $(CONVERTED_BUCKET_NAME) --param event_types write --param suffix ".nut"
 
 # Upload to definition bucket
 bucket_definition_upload_trigger:
@@ -183,9 +184,15 @@ bucket_preview_upload_trigger:
 	ibmcloud fn trigger create bucket_preview_upload_trigger --feed /whisk.system/cos/changes \
 	 --param bucket $(PREVIEW_BUCKET_NAME) --param event_types write --param suffix ".mp4"
 
+# Delete from raw bucket
+bucket_raw_delete_trigger:
+	ibmcloud fn trigger create bucket_raw_delete_trigger --feed /whisk.system/cos/changes \
+	 --param bucket $(RAW_BUCKET_NAME) --param event_types delete
+
 rules: bucket_raw_upload_rule bucket_converted_upload_rule \
-       bucket_trimmed_upload_rule bucket_definition_upload_rule \
-       bucket_final_parts_upload_rule bucket_preview_upload_rule
+       bucket_definition_upload_rule \
+       bucket_final_parts_upload_rule bucket_preview_upload_rule bucket_raw_snapshot_rule \
+       bucket_raw_delete_rule
 
 
 # Upload to raw bucket
@@ -194,11 +201,7 @@ bucket_raw_upload_rule:
 
 # Upload to converted bucket
 bucket_converted_upload_rule:
-	ibmcloud fn rule update bucket_converted_upload_rule bucket_converted_upload_trigger choirless/calc_and_trim
-
-# Upload to trimmed bucket
-bucket_trimmed_upload_rule:
-	ibmcloud fn rule update bucket_trimmed_upload_rule bucket_trimmed_upload_trigger choirless/renderer
+	ibmcloud fn rule update bucket_converted_upload_rule bucket_converted_upload_trigger choirless/calc_and_render
 
 # Upload to definition bucket
 bucket_definition_upload_rule:
@@ -211,6 +214,14 @@ bucket_final_parts_upload_rule:
 # Upload to preview bucket
 bucket_preview_upload_rule:
 	ibmcloud fn rule update bucket_preview_upload_rule bucket_preview_upload_trigger choirless/snapshot
+
+# Upload to raw snapshot rule
+bucket_raw_snapshot_rule:
+	ibmcloud fn rule update bucket_raw_snapshot_rule bucket_raw_upload_trigger choirless/snapshot
+
+# Delete from raw bucket
+bucket_raw_delete_rule:
+	ibmcloud fn rule update bucket_raw_delete_rule bucket_raw_delete_trigger choirless/delete_handler
 
 list:
 	# Display entities in the current namespace

@@ -12,8 +12,8 @@ def main(args):
 
     notification = args.get('notification', {})
     key = notification.get('object_name', args['key'])
-    bucket = notification.get('bucket_name', args['preview_bucket'])
-    dst_bucket = args.get('dst_bucket', bucket)
+    bucket = args.get('bucket', notification.get('bucket_name', args['preview_bucket']))
+    dst_bucket = args.get('dst_bucket', args['snapshots_bucket'])
 
     if key.endswith(".jpg"):
         return {}
@@ -46,8 +46,9 @@ def main(args):
                           seekable=0)
     out = ffmpeg.output(stream,
                         get_output_url(output_key),
-                        seekable=0,
                         format='singlejpeg',
+                        method='PUT',
+                        seekable=0,
                         vframes=1)
     stdout, stderr = out.run()
 

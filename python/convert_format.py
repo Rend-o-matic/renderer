@@ -50,7 +50,8 @@ def main(args):
     # First pass, get details
 
     print("Doing first pass")
-    stream = ffmpeg.input(get_input_url(key))
+    stream = ffmpeg.input(get_input_url(key),
+                          seekable=0)
     audio = stream.audio
     audio = audio.filter('silenceremove',
                          stop_periods=-1,
@@ -100,7 +101,8 @@ def main(args):
 
     # Second pass, apply normalisation
     print("Doing second pass")
-    stream = ffmpeg.input(get_input_url(key))
+    stream = ffmpeg.input(get_input_url(key),
+                          seekable=0)
     video = stream.filter('fps', fps=25, round='up')
     video = video.filter('scale', 640, 480,
                          force_original_aspect_ratio='decrease',

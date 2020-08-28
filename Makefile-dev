@@ -120,14 +120,13 @@ renderer:
 
 # Renderer main process
 renderer_compositor_main:
-	ibmcloud fn action update choirless/renderer_compositor_main python/renderer_compositor_main.py \
-	 --docker $(PYTHON_IMAGE) --timeout 600000 --memory 2048
+	ibmcloud fn action update choirless/renderer_compositor_main js/renderer_compositor_main.js \
+	 --docker $(NODEJS_IMAGE)
 
 # Renderer child process
 renderer_compositor_child:
 	ibmcloud fn action update choirless/renderer_compositor_child python/renderer_compositor_child.py \
-	 --docker $(PYTHON_IMAGE) --timeout 600000 --memory 2048 \
-	 --web true --web-secure $(RENDERER_KEY)
+	 --docker $(PYTHON_IMAGE) --timeout 600000 --memory 2048 
 
 # Renderer final process
 renderer_final:

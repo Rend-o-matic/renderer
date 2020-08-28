@@ -85,10 +85,11 @@ const main = async (opts) => {
       // split into two arrays:
       // - rectangles - is passed to BoxJam
       // - hiddenParts - audio only so added in without position later
-      if (!p.hidden) {
-        rectangles.push(obj)
-      } else {
+      // - audio - parts that never had any video in the first place
+      if (p.hidden || p.audio) {
         hiddenParts.push(obj)
+      } else {
+        rectangles.push(obj)
       }
 
       // add to part map - to allow quick lookup of offset by partId

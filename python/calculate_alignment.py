@@ -93,20 +93,16 @@ def main(args):
     x1, fs1 = load_from_cos(rendition_key)
     print("Loaded from COS: ", rendition_key)
 
-    times0, data0, tempo0, beats0 = process_signal(x0, fs0)
+    data0, tempo0 = process_signal(x0, fs0)
     print("Tempo0:", tempo0)
-    times1, data1, tempo1, beats1 = process_signal(x1, fs1)
+    data1, tempo1 = process_signal(x1, fs1)
     print("Tempo1:", tempo1)
 
     # Check we have a tempo, if not say offset is zero
     if tempo0 > 0 and tempo1 > 0:
-    
         # Actually calculate the offset
         offset, error = find_offset(data0, data1)
         print(f"Offset: {offset} Error: {error}")
-
-        # Convert offset to milliseconds
-        offset = int(((offset * HOP_LENGTH) / SAMPLE_RATE) * 1000)
     else:
         offset, error = 0, 0
 
@@ -152,37 +148,41 @@ def process_signal(x, sr):
     print("Calculated onset_env")
 
     tempo, beats = librosa.beat.beat_track(onset_envelope=onset_env,
-                                           sr=sr)
+                                           sr=sr, units='samples')
     print("Calculated tempo and beats")
 
-    times = librosa.times_like(onset_env, sr=sr, hop_length=HOP_LENGTH)
+    data = np.where(x > x.std()*4.0, 1.0, 0.0)
 
-    print("Calculated times")
-
-    data = np.zeros(len(onset_env))
-    np.put(data, beats, 1)
     for i in range(1, len(data)):
-        data[i] = max(data[i], data[i-1] * 0.9)
+        data[i] = max(data[i], data[i-1] * 0.9999)
 
     for i in range(len(data) - 2, 0, -1):
-        data[i] = max(data[i], data[i+1] * 0.9)
+        data[i] = max(data[i], data[i+1] * 0.9999)
 
-    return times, data, tempo, beats
+    return data, tempo
 
 
 # Find the offest with the lowest error
-def find_offset(x0, x1):
+def find_offset(x0, x1, max_shift_s=0.5, resolution_s=0.01):
     error0 = measure_error(x0, x1, 0)
-    offsets = np.arange(0,50)
-    errors = np.array([measure_error(x0, x1, -offset) for offset in offsets])
-    best_offset = argrelextrema(errors, np.less)[0][0]
-    best_error = errors[best_offset]
+    offsets = np.arange(0, max_shift_s, resolution_s)
+    errors = np.array([measure_error(x0, x1, int(-offset * SAMPLE_RATE)) for offset in offsets])
+
+    times = offsets * 1000
+    mins = argrelextrema(errors, np.less)[0]
+
+    if mins:
+        best = mins[0]
+        best_offset = int(times[best])
+        best_error = errors[best]
+    else:
+        best_offset = 0
+        best_error = error0
 
     if error0 <= best_error:
         return 0, error0
     else:
         return best_offset, best_error
-
 
 # function to measure two waveforms with one offset by a certian amount
 def measure_error(x0, x1, offset):

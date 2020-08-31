@@ -61,6 +61,9 @@ def main(args):
     print("Audio present:" , audio_present)
     print("Video present:", video_present)
 
+    if not (audio_present or video_present):
+        return {"error": "no streams!"}
+
     ## Two pass loudness normalisation
     # First pass, get details
     if audio_present:
@@ -114,14 +117,25 @@ def main(args):
         input_tp=float(loudnorm_stats['input_tp'])
         input_thresh=float(loudnorm_stats['input_thresh'])
 
+        # if the input volume level is so low, we might as well mute it
+        if input_i < -50:
+            print("Input loudness is so low, we are muting it", input_i)
+            audio_present = False
+
     # Second pass, apply normalisation
     print("Doing second pass")
     stream = ffmpeg.input(get_input_url(key),
                           seekable=0)
-    video = stream.filter('fps', fps=25, round='up')
-    video = video.filter('scale', 640, 480,
-                         force_original_aspect_ratio='decrease',
-                         force_divisible_by=2)
+
+    if video_present:
+        video = stream.filter('fps', fps=25, round='up')
+        video = video.filter('scale', 640, 480,
+                             force_original_aspect_ratio='decrease',
+                             force_divisible_by=2)
+    else:
+        video = ffmpeg.input('color=color=black:size=vga',
+                             format='lavfi').video
+
     if audio_present:
         audio = stream.audio
 

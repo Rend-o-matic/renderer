@@ -99,11 +99,12 @@ def main(args):
     print("Tempo1:", tempo1)
 
     # Check we have a tempo, if not say offset is zero
-    if tempo0 > 0 and tempo1 > 0:
+    try:
         # Actually calculate the offset
         offset, error = find_offset(data0, data1)
         print(f"Offset: {offset} Error: {error}")
-    else:
+    except Exception as e:
+        print("Could not sync audio", e)
         offset, error = 0, 0
 
     # If the offset is too great, assume we failed and fallback to zero

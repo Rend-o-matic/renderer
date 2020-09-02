@@ -3,6 +3,7 @@ from functools import partial
 from pathlib import Path
 import json
 import math
+import re
 
 import ffmpeg
 
@@ -71,6 +72,7 @@ def main(args):
         stream = ffmpeg.input(get_input_url(key),
                               seekable=0)
         audio = stream.audio
+        audio = audio.filter('volumedetect')
         audio = audio.filter('silenceremove',
                              stop_periods=-1,
                              stop_duration=1,
@@ -90,6 +92,29 @@ def main(args):
                                       capture_stderr=True)
         output = stdout + stderr
         output_lines = [line.strip() for line in output.decode().split('\n')]
+
+        mute = False
+
+        # Volume detect
+        vol_threshold = int(args.get('vol_threshold', 22))
+        vol_pct = float(args.get('vol_pct', 0.05))
+
+        total_samples = 0
+        high_samples = 0
+        hist_re = re.compile(r'histogram_(\d+)db: (\d+)')
+        for line in output_lines:
+            mo = hist_re.search(line)
+            if mo:
+                level, samples = mo.groups()
+                total_samples += int(samples)
+                if int(level) < vol_threshold:
+                    high_samples += int(samples)
+
+        if high_samples/total_samples < vol_pct:
+            print(f"Input volume is so low, we are muting it {high_samples/total_samples:.2f} above {vol_threshold}")
+            mute = True
+
+        # Loudnorm
         loudnorm_start = False
         loudnorm_end = False
 
@@ -118,9 +143,9 @@ def main(args):
         input_thresh=float(loudnorm_stats['input_thresh'])
 
         # if the input volume level is so low, we might as well mute it
-        if input_i < -50:
+        if input_i < -40:
             print("Input loudness is so low, we are muting it", input_i)
-            audio_present = False
+            mute = True
 
     # Second pass, apply normalisation
     print("Doing second pass")
@@ -140,9 +165,12 @@ def main(args):
         audio = stream.audio
 
         # If the normalisation appears to detect no sound then just mute audio
-        if input_i == -math.inf or input_lra == 0 or target_offset == math.inf:
+        if mute or input_i == -math.inf or input_lra == 0 or target_offset == math.inf:
             audio = audio.filter('volume', 0)
         else:
+#            audio = audio.filter('agate',
+#                                 threshold=0.03,
+#                                 release=1000)
             audio = audio.filter('loudnorm',
                                  i=-14,
                                  offset=target_offset,
@@ -153,10 +181,11 @@ def main(args):
                                  linear=True,
                                  dual_mono=True,
                                  print_format='summary')
-            audio = audio.filter('aresample', 44100)
+        audio = audio.filter('aresample', 44100)
     else:
         audio = ffmpeg.input('anullsrc',
                              format='lavfi').audio
+
 
     pipeline = ffmpeg.output(audio,
                              video,

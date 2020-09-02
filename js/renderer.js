@@ -25,14 +25,15 @@ const main = async (opts) => {
   }
 
   // get optional parameters
-  const width = opts.width || 1920
-  const height = opts.height || 1080
-  const reverb = opts.reverb || 0.1
+  const width = parseInt(opts.width) || 1920
+  const height = parseInt(opts.height) || 1080
+  const reverb = parseFloat(opts.reverb) || 0.1
   const reverbType = opts.reverbType || 'hall'
   const panning = opts.panning || true
   const watermark = opts.watermark || 'choirless_watermark.png'
-  const margin = opts.margin || 10
+  const margin = parseInt(opts.margin) || 10
   const center = opts.center || true
+  const name = opts.name || 'auto'
 
   // COS
   opts.COS_ENDPOINT = opts.COS_ENDPOINT || opts.endpoint || 'https://s3.eu-gb.cloud-object-storage.appdomain.cloud'
@@ -152,7 +153,7 @@ const main = async (opts) => {
     console.log('output', JSON.stringify(output))
 
     // write the definition to a COS bucket
-    const key = [choirId, songId, 'auto'].join('+') + '.json'
+    const key = [choirId, songId, name].join('+') + '.json'
     await cos.putObject({ Bucket: opts.definition_bucket, Key: key, Body: JSON.stringify(output) }).promise()
     console.log('written key', key)
     return { ok: true }

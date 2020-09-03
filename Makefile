@@ -101,7 +101,7 @@ actions: convert_format calculate_alignment trim_clip \
 # Convert format
 convert_format:
 	ibmcloud fn action update choirless/convert_format python/convert_format.py \
-	 --docker $(PYTHON_IMAGE) --timeout 600000 --memory 512
+	 --docker $(PYTHON_IMAGE) --timeout 600000 --memory 2048
 
 # Calculate alignment
 calculate_alignment:

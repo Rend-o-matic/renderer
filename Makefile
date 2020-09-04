@@ -7,6 +7,7 @@ COS_ENDPOINT = s3.private.eu-gb.cloud-object-storage.appdomain.cloud
 RAW_BUCKET_NAME ?= choirless-videos-raw
 CONVERTED_BUCKET_NAME ?= choirless-videos-converted
 DEFINITION_BUCKET_NAME ?= choirless-videos-definition
+PREPROD_BUCKET_NAME ?= choirless-videos-preprod
 PREVIEW_BUCKET_NAME ?= choirless-videos-preview
 FINAL_PARTS_BUCKET_NAME ?= choirless-videos-final-parts
 FINAL_BUCKET_NAME ?= choirless-videos-final
@@ -55,6 +56,7 @@ create-buckets:
 	ibmcloud cos create-bucket --bucket $(CONVERTED_BUCKET_NAME) --ibm-service-instance-id $(COS_INSTANCE_NAME) --region $(COS_REGION)
 	ibmcloud cos create-bucket --bucket $(DEFINITION_BUCKET_NAME) --ibm-service-instance-id $(COS_INSTANCE_NAME) --region $(COS_REGION)
 	ibmcloud cos create-bucket --bucket $(FINAL_PARTS_BUCKET_NAME) --ibm-service-instance-id $(COS_INSTANCE_NAME) --region $(COS_REGION)
+	ibmcloud cos create-bucket --bucket $(PREPROD_BUCKET_NAME) --ibm-service-instance-id $(COS_INSTANCE_NAME) --region $(COS_REGION)
 	ibmcloud cos create-bucket --bucket $(PREVIEW_BUCKET_NAME) --ibm-service-instance-id $(COS_INSTANCE_NAME) --region $(COS_REGION)
 	ibmcloud cos create-bucket --bucket $(FINAL_BUCKET_NAME) --ibm-service-instance-id $(COS_INSTANCE_NAME) --region $(COS_REGION)
 	ibmcloud cos create-bucket --bucket $(STATUS_BUCKET_NAME) --ibm-service-instance-id $(COS_INSTANCE_NAME) --region $(COS_REGION)
@@ -84,6 +86,7 @@ package:
 	 --param raw_bucket $(RAW_BUCKET_NAME) \
 	 --param converted_bucket $(CONVERTED_BUCKET_NAME) \
 	 --param final_parts_bucket $(FINAL_PARTS_BUCKET_NAME) \
+	 --param preprod_bucket $(PREPROD_BUCKET_NAME) \
 	 --param preview_bucket $(PREVIEW_BUCKET_NAME) \
 	 --param final_bucket $(FINAL_BUCKET_NAME) \
 	 --param status_bucket $(STATUS_BUCKET_NAME) \
@@ -96,7 +99,7 @@ package:
 # Actions
 actions: convert_format calculate_alignment trim_clip \
 	 renderer renderer_compositor_main renderer_compositor_child renderer_final \
-	 snapshot delete_handler
+	 snapshot delete_handler post_production
 
 # Convert format
 convert_format:
@@ -148,6 +151,12 @@ delete_handler:
 	ibmcloud fn action update choirless/delete_handler js/delete_handler.js \
 	 --docker $(NODEJS_IMAGE)
 
+# Post-production
+post_production:
+	ibmcloud fn action update choirless/post_production python/post_production.py \
+	 --docker $(PYTHON_IMAGE) --timeout 600000 --memory 2048
+
+
 sequences: calc_and_render
 
 # Calc alignment and kick of render of json definition
@@ -157,7 +166,7 @@ calc_and_render:
 triggers: bucket_raw_upload_trigger bucket_converted_upload_trigger \
 	  bucket_definition_upload_trigger \
 	  bucket_final_parts_upload_trigger bucket_preview_upload_trigger \
-	  bucket_raw_delete_trigger
+	  bucket_raw_delete_trigger bucket_preprod_upload_trigger 
 
 # Upload to raw bucket
 bucket_raw_upload_trigger:
@@ -179,6 +188,11 @@ bucket_final_parts_upload_trigger:
 	ibmcloud fn trigger create bucket_final_parts_upload_trigger --feed /whisk.system/cos/changes \
 	 --param bucket $(FINAL_PARTS_BUCKET_NAME) --param event_types write
 
+# Upload to pre-prod
+bucket_preprod_upload_trigger:
+	ibmcloud fn trigger create bucket_preprod_upload_trigger --feed /whisk.system/cos/changes \
+	 --param bucket $(PREPROD_BUCKET_NAME) --param event_types write
+
 # Upload to preview bucket
 bucket_preview_upload_trigger:
 	ibmcloud fn trigger create bucket_preview_upload_trigger --feed /whisk.system/cos/changes \
@@ -192,7 +206,7 @@ bucket_raw_delete_trigger:
 rules: bucket_raw_upload_rule bucket_converted_upload_rule \
        bucket_definition_upload_rule \
        bucket_final_parts_upload_rule bucket_preview_upload_rule bucket_raw_snapshot_rule \
-       bucket_raw_delete_rule
+       bucket_raw_delete_rule bucket_preprod_upload_rule
 
 
 # Upload to raw bucket
@@ -210,6 +224,10 @@ bucket_definition_upload_rule:
 # Upload to final parts bucket
 bucket_final_parts_upload_rule:
 	ibmcloud fn rule update bucket_final_parts_upload_rule bucket_final_parts_upload_trigger choirless/renderer_final
+
+# Upload to pre-prod bucket
+bucket_preprod_upload_rule:
+	ibmcloud fn rule update bucket_preprod_upload_rule bucket_preprod_upload_trigger choirless/post_production
 
 # Upload to preview bucket
 bucket_preview_upload_rule:

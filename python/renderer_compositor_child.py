@@ -97,7 +97,6 @@ def main(args):
     row_input_specs = tuple(specs_for_row(input_specs, row_num))
 
     # Calculate bounding boxes and padding
-    total_top, total_bottom = calc_bounding_box(input_specs)
     top, bottom = calc_bounding_box(row_input_specs)
     margin = 10
 
@@ -108,14 +107,6 @@ def main(args):
     # by default rows are at top
     row_y = 0
 
-    if top == total_top:
-        # first row, pad it further
-        output_height += top
-        row_y = top
-    if bottom == total_bottom:
-        # last row, pad it further
-        output_height += (total_output_height - total_bottom)
-
     # Main combination process
     audio_inputs = []
     video_inputs = []
@@ -123,8 +114,6 @@ def main(args):
     streams_and_filename = []
 
     for spec in row_input_specs:
-        # Get co-ords for video
-        x, _ = spec['position']
         # Get the part spec and input
         part_id = spec['part_id']
         part_key = f"{choir_id}+{song_id}+{part_id}.nut"
@@ -133,9 +122,12 @@ def main(args):
         # process the spec
         video, audio = process_spec(part_url, spec)
 
-        video_inputs.append(video)
         audio_inputs.append(audio)
-        coords.append((x, row_y))
+        # Get co-ords for video
+        if video is not None:
+            video_inputs.append(video)
+            x, _ = spec['position']
+            coords.append((x, row_y))
 
     # Combine the audio parts if there are any
     if len(audio_inputs) > 0:
@@ -229,6 +221,8 @@ def calc_bounding_box(specs):
             continue
         x, y = spec['position']
         width, height = spec['size']
+        # round height down to next even number as that is what the scaler will so
+        height = height // 2 * 2
         if y < top:
             top = y
         if (y + height) > bottom:
@@ -238,27 +232,32 @@ def calc_bounding_box(specs):
 
 
 def process_spec(part_url, spec):
-    # Get the part spec and input
-    x, y = spec['position']
-    width, height = spec['size']
-
-    # Calc the offset in seconds
-    offset = spec.get('offset', 0)
-    offset = float(offset) / 1000
-
     # main stream input
     stream = ffmpeg.input(part_url,
                           seekable=0,
                           r=25,
                           thread_queue_size=64)
     
+    # Calc the offset in seconds
+    offset = spec.get('offset', 0)
+    offset = float(offset) / 1000
+
+    # Get the part spec and input
     # video
-    video = stream.video
-    if offset > 0:
-        video = video.filter('trim',
+    if 'position' in spec:
+        width, height = spec['size']
+        
+        video = stream.video
+        if offset > 0:
+            video = video.filter('trim',
                              start=offset)
-    video = video.filter('setpts', 'PTS-STARTPTS')
-    video = video.filter('scale', width, height)
+        video = video.filter('setpts', 'PTS-STARTPTS')
+        video = video.filter('scale', width, height,
+                             force_original_aspect_ratio='decrease',
+                             force_divisible_by=2)
+    
+    else:
+        video = None
 
     # audio
     audio = stream.audio

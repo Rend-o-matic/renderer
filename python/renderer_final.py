@@ -30,7 +30,6 @@ def main(args):
     choir_id, song_id, def_id, run_id, row_num, rows_hash = parse_key(key)
 
     src_bucket = args['final_parts_bucket']
-    dst_bucket = args['preview_bucket']
 
     ## Check all parts present if, not abort
     key_prefix =  f'{choir_id}+{song_id}+{def_id}+{run_id}'
@@ -66,7 +65,7 @@ def process(args):
     choir_id, song_id, def_id, run_id, row_num, rows_hash = parse_key(key)
 
     src_bucket = args['final_parts_bucket']
-    dst_bucket = args['preview_bucket']
+    dst_bucket = args['preprod_bucket']
     misc_bucket = args['misc_bucket']
 
     # Download the definition file for this job
@@ -95,6 +94,14 @@ def process(args):
                             geo,
                             src_bucket)
     
+    get_output_url = partial(create_signed_url,
+                             host,
+                             'PUT',
+                             cos_api_key,
+                             cos_api_secret,
+                             geo,
+                             dst_bucket)
+
     get_misc_url = partial(create_signed_url,
                             host,
                             'GET',
@@ -106,117 +113,79 @@ def process(args):
     ### Combine video and audio
     ###
     
-    # Create a temp dir for our files to use
-    with tempfile.TemporaryDirectory() as tmpdir:
-        # video
-        if len(row_keys) > 1:
-            # Multiple video parts
-            video_parts = []
-            audio_parts = []
-            for row_key in row_keys:
-                _, _, _, _, row_num, _ = parse_key(row_key)
-                row_url = get_input_url(row_key)
-                row_part = ffmpeg.input(row_url,
-                                        seekable=0,
-                                        thread_queue_size=64)
-                if row_num != -1:
-                    video_parts.append(row_part.video)
-                audio_parts.append(row_part.audio)
-                
-            video = ffmpeg.filter(video_parts, 'vstack',
-                                  inputs=len(video_parts))
-            audio = ffmpeg.filter(audio_parts,
-                                  'amix',
-                                  inputs=len(audio_parts))
-        else:
-            # Just a single video part
-            row_key = row_keys[0]
+    # video
+    if len(row_keys) > 1:
+        # Multiple video parts
+        video_parts = []
+        audio_parts = []
+        for row_key in row_keys:
             _, _, _, _, row_num, _ = parse_key(row_key)
             row_url = get_input_url(row_key)
             row_part = ffmpeg.input(row_url,
                                     seekable=0,
                                     thread_queue_size=64)
             if row_num != -1:
-                video = row_part.video
-            else:
-                video = None
-            audio = row_part.audio
+                video_parts.append(row_part.video)
+            audio_parts.append(row_part.audio)
 
-        # Overlay the watermark if present
-        watermark_file = output_spec.get('watermark')
-        if watermark_file and video:
-            watermark_url = get_misc_url(watermark_file)
-            watermark = ffmpeg.input(watermark_url,
-                                     seekable=0)
-            video = video.overlay(watermark,
-                                  x='W-w-20',
-                                  y='H-h-20')
-             
-        # Normalise the audio loudness
-#        audio = audio.filter('loudnorm',
-#                             i=-14)
+        video = ffmpeg.filter(video_parts, 'vstack',
+                              inputs=len(video_parts))
+        audio = ffmpeg.filter(audio_parts,
+                              'amix',
+                              inputs=len(audio_parts))
+    else:
+        # Just a single video part
+        row_key = row_keys[0]
+        _, _, _, _, row_num, _ = parse_key(row_key)
+        row_url = get_input_url(row_key)
+        row_part = ffmpeg.input(row_url,
+                                seekable=0,
+                                thread_queue_size=64)
+        if row_num != -1:
+            video = row_part.video
+        else:
+            video = None
+        audio = row_part.audio
 
-        # Add reverb in if present
-        reverb_type = output_spec.get('reverb_type')
-        if reverb_type:
-            reverb_url = get_misc_url(f'{reverb_type}.wav')
-            reverb_pct = float(output_spec.get('reverb', 0.1))
-            if reverb_pct > 0:
-                reverb_part = ffmpeg.input(reverb_url,
-                                           seekable=0)
-                split_audio = audio.filter_multi_output('asplit')
-                reverb = ffmpeg.filter([split_audio[1], reverb_part],
-                                       'afir',
-                                       dry=10, wet=10)
-                audio = ffmpeg.filter([split_audio[0], reverb],
-                                      'amix',
-                                      dropout_transition=180,
-                                      inputs=2,
-                                      weights=f'{1-reverb_pct} {reverb_pct}')
+    # Output
+    output_key = f'{choir_id}+{song_id}+{def_id}-preprod.nut'
+    output_url = get_output_url(output_key)
 
-        # Output
-        output_key = f'{choir_id}+{song_id}+{def_id}-final.mp4'
-        output_path = str(Path(tmpdir, output_key))
+    kwargs = {}
+    if 'duration' in args:
+        kwargs['t'] = int(args['duration'])
 
-        kwargs = {}
-        if 'duration' in args:
-            kwargs['t'] = int(args['duration'])
+    if 'loglevel' in args:
+        kwargs['v'] = args['loglevel']
 
-        if 'loglevel' in args:
-            kwargs['v'] = args['loglevel']
+    pipeline = ffmpeg.output(audio,
+                             video,
+                             output_url,
+                             format='nut',
+                             pix_fmt='yuv420p',
+                             acodec='pcm_s16le',
+                             vcodec='mpeg2video',
+                             method='PUT',
+                             r=25,
+                             seekable=0,
+                             qscale=1,
+                             qmin=1,
+                             **kwargs
+    )
 
-        streams_and_filename = []
-        streams_and_filename.append(audio)
-        if video:
-            streams_and_filename.append(video)
-        streams_and_filename.append(output_path)
+    cmd = pipeline.compile()
+    print("ffmpeg command to run: ", cmd)
+    t1 = time.time()
+    pipeline.run()
+    t2 = time.time()
 
-        pipeline = ffmpeg.output(*streams_and_filename,
-#                                 audio,
-#                                 video,
-#                                 output_path,
-                                 pix_fmt='yuv420p',
-                                 vcodec='libx264',
-                                 preset='veryfast',
-                                 movflags='+faststart',
-                                 **kwargs
-        ) 
-        cmd = pipeline.compile()
-        print("ffmpeg command to run: ", cmd)
-        t1 = time.time()
-        pipeline.run()
-        t2 = time.time()
+    ret = {'dst_key': output_key,
+           'run_id': run_id,
+           'def_id': def_id,
+           'render_time': int(t2-t1),
+           'status': 'merged'}
 
-        # Upload the final file
-        cos.upload_file(output_path, dst_bucket, output_key)
-        
-        ret = {'dst_key': output_key,
-               'run_id': run_id,
-               'def_id': def_id,
-               'render_time': int(t2-t1),
-               'status': 'merged'}
-
-        return ret
+    return ret
 
 def parse_key(key):
     choir_id, song_id, def_id, run_id, section_id = Path(key).stem.split('+')

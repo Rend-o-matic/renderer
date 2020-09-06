@@ -8,6 +8,9 @@ import tempfile
 from pathlib import Path
 from urllib.parse import urljoin
 from scipy.signal import argrelextrema
+import peakutils
+from surfboard.sound import Waveform
+
 
 import requests
 
@@ -93,12 +96,9 @@ def main(args):
     x1, fs1 = load_from_cos(rendition_key)
     print("Loaded from COS: ", rendition_key)
 
-    data0, tempo0 = process_signal(x0, fs0)
-    print("Tempo0:", tempo0)
-    data1, tempo1 = process_signal(x1, fs1)
-    print("Tempo1:", tempo1)
+    data0 = process_signal(x0, fs0)
+    data1 = process_signal(x1, fs1)
 
-    # Check we have a tempo, if not say offset is zero
     try:
         # Actually calculate the offset
         offset, error = find_offset(data0, data1)
@@ -143,47 +143,48 @@ def main(args):
 # function to process the signals and get something that
 # we can compare against each other.
 def process_signal(x, sr):
+    # calculate the spectral flux of the waveform
+    wave = Waveform(signal=x, sample_rate=sr)
+    flux = wave.spectral_flux()[0]
+    # find the peaks in the spectral flux
+    peaks = peakutils.indexes(flux, thres=0.3, min_dist=30)
+    num_peaks = len(peaks)
+    print("Number of peaks found", num_peaks)
 
-    onset_env = librosa.onset.onset_strength(x, sr=sr,
-                                             aggregate=np.median)
-    print("Calculated onset_env")
+    # initialize an array of zeros and then set the peaks to ones
+    data = np.zeros(len(flux)+1, dtype=np.int64)
+    if num_peaks == 0:
+        return data
 
-    tempo, beats = librosa.beat.beat_track(onset_envelope=onset_env,
-                                           sr=sr, units='samples')
-    print("Calculated tempo and beats")
+    np.put(data, peaks, 1)
 
-    data = np.where(x > x.std()*4.0, 1.0, 0.0)
-
+    # create decay shape from the peaks
     for i in range(1, len(data)):
-        data[i] = max(data[i], data[i-1] * 0.9999)
+        data[i] = max(data[i], data[i-1] * 0.9)
 
     for i in range(len(data) - 2, 0, -1):
-        data[i] = max(data[i], data[i+1] * 0.9999)
+        data[i] = max(data[i], data[i+1] * 0.9)
 
-    return data, tempo
+    return data
 
 
 # Find the offest with the lowest error
-def find_offset(x0, x1, max_shift_s=0.5, resolution_s=0.01):
+def find_offset(x0, x1):
     error0 = measure_error(x0, x1, 0)
-    offsets = np.arange(0, max_shift_s, resolution_s)
-    errors = np.array([measure_error(x0, x1, int(-offset * SAMPLE_RATE)) for offset in offsets])
+    errors = []
 
-    times = offsets * 1000
-    mins = argrelextrema(errors, np.less)[0]
+    for offset in range(50):
+        err = measure_error(x0, x1, -offset)
+        errors.append(err)
 
-    if mins:
-        best = mins[0]
-        best_offset = int(times[best])
-        best_error = errors[best]
-    else:
-        best_offset = 0
-        best_error = error0
+    best_error = min(errors)
 
-    if error0 <= best_error:
-        return 0, error0
-    else:
+    if best_error < error0:
+        best_offset = np.argmin(errors) * 0.01 * 1000
         return best_offset, best_error
+    else:
+        return 0, error0
+
 
 # function to measure two waveforms with one offset by a certian amount
 def measure_error(x0, x1, offset):

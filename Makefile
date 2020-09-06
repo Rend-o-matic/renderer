@@ -24,8 +24,8 @@ CHOIRLESS_API_KEY ?=
 RENDERER_KEY ?= 
 
 # Docker images
-PYTHON_IMAGE ?= choirless/choirless_py_actions:release-0.20
-NODEJS_IMAGE ?= choirless/choirless_js_actions:release-0.20
+PYTHON_IMAGE ?= choirless/choirless_py_actions:release-0.21
+NODEJS_IMAGE ?= choirless/choirless_js_actions:release-0.21
 
 # MQTT details
 MQTT_BROKER ?= mqtt.eclipse.org:1883

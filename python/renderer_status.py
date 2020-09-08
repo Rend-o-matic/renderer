@@ -25,8 +25,7 @@ def main(args):
                   }
 
         # make HTTP POST request with application/json header
-        req = requests.post(urljoin(api_url, 'render'), params=params, json=payload)
-        req.json()
+        requests.post(urljoin(api_url, 'render'), params=params, json=payload)
 
     except:
-        print("Could not post render status into the API: choirId {choir_id} songId {song_id} partId {part_id} status {status}")
+        print(f"Could not post render status into the API: choirId {choir_id} songId {song_id} partId {part_id} status {status}")

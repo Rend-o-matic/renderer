@@ -132,6 +132,7 @@ def process(args):
                               inputs=len(video_parts))
         audio = ffmpeg.filter(audio_parts,
                               'amix',
+                              dropout_transition=180,
                               inputs=len(audio_parts))
     else:
         # Just a single video part

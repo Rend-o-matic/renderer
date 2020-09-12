@@ -173,7 +173,7 @@ def find_offset(x0, x1):
     error0 = measure_error(x0, x1, 0)
     errors = []
 
-    for offset in range(50):
+    for offset in range(30):
         err = measure_error(x0, x1, -offset)
         errors.append(err)
 

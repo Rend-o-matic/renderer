@@ -6,6 +6,8 @@ def main(args):
     # Tell the API the current render sttus
     try:
         # get passed-in arguments
+        args.setdefault('part_id', None)
+        args.setdefault('status', 'new')
         api_url = args['CHOIRLESS_API_URL']
         api_key = args['CHOIRLESS_API_KEY']
         choir_id = args['choir_id']
@@ -23,9 +25,10 @@ def main(args):
                     'partId': part_id,
                     'status': status
                   }
-
+        print(payload)
         # make HTTP POST request with application/json header
         requests.post(urljoin(api_url, 'render'), params=params, json=payload)
 
     except:
         print(f"Could not post render status into the API: choirId {choir_id} songId {song_id} partId {part_id} status {status}")
+

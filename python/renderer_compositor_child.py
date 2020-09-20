@@ -138,8 +138,9 @@ def main(args):
 
         # Adjust the volume in proportion to total number of parts
         volume = len(row_input_specs) / float(max_row_len)
-        audio_pipeline = audio_pipeline.filter('volume',
-                                               volume=volume)
+        if volume != 1.0:
+            audio_pipeline = audio_pipeline.filter('volume',
+                                                   volume=volume)
 
         streams_and_filename.append(audio_pipeline)
 

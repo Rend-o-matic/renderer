@@ -14,6 +14,7 @@ FINAL_BUCKET_NAME ?= choirless-videos-final
 STATUS_BUCKET_NAME ?= choirless-videos-status
 SNAPSHOTS_BUCKET_NAME ?= choirless-videos-snapshots
 MISC_BUCKET_NAME ?= choirless-videos-misc
+DEBUG_BUCKET_NAME ?= choirless-videos-debug
 
 # Namespace functions will be created int
 NAMESPACE_NAME ?= choirless
@@ -24,8 +25,8 @@ CHOIRLESS_API_KEY ?=
 RENDERER_KEY ?= 
 
 # Docker images
-PYTHON_IMAGE ?= choirless/choirless_py_actions:release-0.21
-NODEJS_IMAGE ?= choirless/choirless_js_actions:release-0.21
+PYTHON_IMAGE ?= choirless/choirless_py_actions:release-0.22
+NODEJS_IMAGE ?= choirless/choirless_js_actions:release-0.22
 
 # MQTT details
 MQTT_BROKER ?= mqtt.eclipse.org:1883
@@ -91,6 +92,7 @@ package:
 	 --param final_bucket $(FINAL_BUCKET_NAME) \
 	 --param status_bucket $(STATUS_BUCKET_NAME) \
 	 --param snapshots_bucket $(SNAPSHOTS_BUCKET_NAME) \
+	 --param debug_bucket $(DEBUG_BUCKET_NAME) \
 	 --param misc_bucket $(MISC_BUCKET_NAME)
 
 	# Bind COS instance to the package

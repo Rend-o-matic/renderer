@@ -8,6 +8,7 @@ import tempfile
 from functools import partial
 import time
 import hashlib
+import re
 
 import ffmpeg
 
@@ -94,14 +95,11 @@ def main(args):
                                   x='W-w-20',
                                   y='H-h-20')
              
-        print("Doing first pass loudnorm")
+        print("Doing first pass")
         stream = ffmpeg.input(get_input_url(key),
                               seekable=0)
         audio = stream.audio
-        audio = audio.filter('loudnorm',
-                             i=-14,
-                             dual_mono=True,
-                             print_format='json')
+        audio = audio.filter('volumedetect')
         pipeline = ffmpeg.output(audio,
                                  "-",
                                  format='null')
@@ -114,50 +112,50 @@ def main(args):
         output = stdout + stderr
         output_lines = [line.strip() for line in output.decode().split('\n')]
 
-        loudnorm_start = False
-        loudnorm_end = False
+        mute = False
 
-        for index, line in enumerate(output_lines):
-            if line.startswith('[Parsed_loudnorm'):
-                loudnorm_start = index + 1
-                continue
-            if loudnorm_start and line.startswith('}'):
-                loudnorm_end = index + 1
-                break
+        # Volume detect
+        vol_threshold = int(args.get('vol_threshold', 22))
+        vol_pct = float(args.get('vol_pct', 0.05))
 
-        if not (loudnorm_start and loudnorm_end):
-            raise Exception("Could not parse loudnorm stats; no loudnorm-related output found")
+        total_samples = 0
+        high_samples = 0
+        max_volume = 0
+        hist_re = re.compile(r'histogram_(\d+)db: (\d+)')
+        maxvol_re = re.compile(r'max_volume: (-?\d+\.?\d*) dB')
+        for line in output_lines:
+            # Search for histogram
+            mo = hist_re.search(line)
+            if mo:
+                level, samples = mo.groups()
+                total_samples += int(samples)
+                if int(level) < vol_threshold:
+                    high_samples += int(samples)
 
-        try:
-            loudnorm_stats = json.loads('\n'.join(output_lines[loudnorm_start:loudnorm_end]))
-        except Exception as e:
-            raise Exception("Could not parse loudnorm stats; wrong JSON format in string: {e}")
+            # Search for max volume
+            mo = maxvol_re.search(line)
+            if mo:
+                max_volume = float(mo.groups()[0])
 
-        print("json stats", loudnorm_stats)
+        if high_samples/total_samples < vol_pct:
+            print(f"Input volume is so low, we are muting it {high_samples/total_samples:.2f} above {vol_threshold}")
+            mute = True
 
-        target_offset = float(loudnorm_stats['target_offset'])
-        input_i=float(loudnorm_stats['input_i'])
-        input_lra=float(loudnorm_stats['input_lra'])
-        input_tp=float(loudnorm_stats['input_tp'])
-        input_thresh=float(loudnorm_stats['input_thresh'])
+        target_peak = 0
+        volume_gain = target_peak - max_volume
+        volume_gain = f"{volume_gain:.2f} dB"
 
         # Second pass, apply normalisation
         print("Doing second pass loudnorm")
         stream = ffmpeg.input(get_input_url(key),
                               seekable=0)
 
-        audio = audio.filter('loudnorm',
-                             i=-14,
-                             offset=target_offset,
-                             measured_i=input_i,
-                             measured_lra=input_lra,
-                             measured_tp=input_tp,
-                             measured_thresh=input_thresh,
-                             linear=True,
-                             print_format='summary')
+        print("Volume gain to apply:", volume_gain)
+        audio = audio.filter('volume',
+                             volume_gain)
 
         # Add in audio compression
-        audio = audio.filter('acompressor')
+#        audio = audio.filter('acompressor')
         
         # Add reverb in if present
         reverb_type = output_spec.get('reverb_type')

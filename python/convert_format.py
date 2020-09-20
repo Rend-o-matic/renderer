@@ -73,14 +73,6 @@ def main(args):
                               seekable=0)
         audio = stream.audio
         audio = audio.filter('volumedetect')
-        audio = audio.filter('silenceremove',
-                             stop_periods=-1,
-                             stop_duration=1,
-                             stop_threshold='-60dB')
-        audio = audio.filter('loudnorm',
-                             i=-14,
-                             dual_mono=True,
-                             print_format='json')
         pipeline = ffmpeg.output(audio,
                                  "-",
                                  format='null')
@@ -101,8 +93,11 @@ def main(args):
 
         total_samples = 0
         high_samples = 0
+        max_volume = 0
         hist_re = re.compile(r'histogram_(\d+)db: (\d+)')
+        maxvol_re = re.compile(r'max_volume: (-?\d+\.?\d*) dB')
         for line in output_lines:
+            # Search for histogram
             mo = hist_re.search(line)
             if mo:
                 level, samples = mo.groups()
@@ -110,43 +105,19 @@ def main(args):
                 if int(level) < vol_threshold:
                     high_samples += int(samples)
 
+            # Search for max volume
+            mo = maxvol_re.search(line)
+            if mo:
+                max_volume = float(mo.groups()[0])
+
         if high_samples/total_samples < vol_pct:
             print(f"Input volume is so low, we are muting it {high_samples/total_samples:.2f} above {vol_threshold}")
             mute = True
 
-        # Loudnorm
-        loudnorm_start = False
-        loudnorm_end = False
-
-        for index, line in enumerate(output_lines):
-            if line.startswith('[Parsed_loudnorm'):
-                loudnorm_start = index + 1
-                continue
-            if loudnorm_start and line.startswith('}'):
-                loudnorm_end = index + 1
-                break
-
-        if not (loudnorm_start and loudnorm_end):
-            raise Exception("Could not parse loudnorm stats; no loudnorm-related output found")
-
-        try:
-            loudnorm_stats = json.loads('\n'.join(output_lines[loudnorm_start:loudnorm_end]))
-        except Exception as e:
-            raise Exception("Could not parse loudnorm stats; wrong JSON format in string: {e}")
-
-        print("json stats", loudnorm_stats)
-
-        target_offset = float(loudnorm_stats['target_offset'])
-        input_i=float(loudnorm_stats['input_i'])
-        input_lra=float(loudnorm_stats['input_lra'])
-        input_tp=float(loudnorm_stats['input_tp'])
-        input_thresh=float(loudnorm_stats['input_thresh'])
-
-        # if the input volume level is so low, we might as well mute it
-        if input_i < -40:
-            print("Input loudness is so low, we are muting it", input_i)
-            mute = True
-
+        target_peak = -2
+        volume_gain = target_peak - max_volume
+        volume_gain = f"{volume_gain:.2f} dB"
+            
     # Second pass, apply normalisation
     print("Doing second pass")
     stream = ffmpeg.input(get_input_url(key),
@@ -165,22 +136,12 @@ def main(args):
         audio = stream.audio
 
         # If the normalisation appears to detect no sound then just mute audio
-        if mute or input_i == -math.inf or input_lra == 0 or target_offset == math.inf:
-            audio = audio.filter('volume', 0)
-        else:
-#            audio = audio.filter('agate',
-#                                 threshold=0.03,
-#                                 release=1000)
-            audio = audio.filter('loudnorm',
-                                 i=-14,
-                                 offset=target_offset,
-                                 measured_i=input_i,
-                                 measured_lra=input_lra,
-                                 measured_tp=input_tp,
-                                 measured_thresh=input_thresh,
-                                 linear=True,
-                                 dual_mono=True,
-                                 print_format='summary')
+        if mute:
+            volume_gain = 0
+            
+        print("Volume gain to apply:", volume_gain)
+        audio = audio.filter('volume',
+                             volume_gain)
         audio = audio.filter('aresample', 44100)
     else:
         audio = ffmpeg.input('anullsrc',

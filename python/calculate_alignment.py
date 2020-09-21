@@ -163,11 +163,14 @@ def main(args):
                 pass
 
         offsets = np.array(offsets)
+        if len(offsets):
 
-        uniques, counts = np.unique(offsets, return_counts=True)
+            uniques, counts = np.unique(offsets, return_counts=True)
 
-        best_offset = uniques[np.argmax(counts)]
-        offset_ms = int(times[best_offset])
+            best_offset = uniques[np.argmax(counts)]
+            offset_ms = int(times[best_offset])
+        else:
+            offset_ms = 0
         print(f"Offset: {offset_ms}")
 
         # Plot the output
@@ -192,7 +195,7 @@ def main(args):
     except Exception as e:
         raise
         print("Could not sync audio", e)
-        offset_ms, err = 0, 0
+        offset_ms = 0
 
     # If the offset is too great, assume we failed and fallback to zero
     if offset_ms > 700 or offset_ms < -700:
@@ -215,10 +218,9 @@ def main(args):
         resp.raise_for_status()
 
     except Exception as e:
-        print(f"Could not store offset in API: choidId {choir_id} songId {song_id} partId {part_id} offset {offset_ms} error: {e}")
+        print(f"Could not store offset in API: choidId {choir_id} songId {song_id} partId {part_id} offset {offset_ms}")
 
     ret = {"offset":  offset_ms,
-           "err": err,
            "key": rendition_key,
            "rendition_key": rendition_key,
            "reference_key": reference_key,
@@ -237,6 +239,8 @@ def frames_to_ms(frames, sr):
 
 def calc_prominence_threshold(signal):
     peaks, properties = find_peaks(signal, prominence=0)
+    if len(peaks) == 0:
+        return 0
     prominence = np.quantile(properties["prominences"], 0.9)
     return prominence
 

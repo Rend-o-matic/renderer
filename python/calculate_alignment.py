@@ -137,7 +137,7 @@ def main(args):
         # Acutally calc the offset
         offsets = []
         lookahead_ms = 100
-        lookbehind_ms = 700
+        lookbehind_ms = 400
 
         offsets = []
         potential_offsets = np.arange(int(ms_to_frames(-lookahead_ms, SAMPLE_RATE)),

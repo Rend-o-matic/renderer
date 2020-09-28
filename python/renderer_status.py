@@ -6,14 +6,12 @@ def main(args):
     # Tell the API the current render sttus
     try:
         # get passed-in arguments
-        args.setdefault('part_id', None)
-        args.setdefault('status', 'new')
-        api_url = args['CHOIRLESS_API_URL']
-        api_key = args['CHOIRLESS_API_KEY']
-        choir_id = args['choir_id']
-        song_id = args['song_id']
-        part_id = args['part_id']
-        status = args['status']
+        api_url = args.get('CHOIRLESS_API_URL')
+        api_key = args.get('CHOIRLESS_API_KEY')
+        choir_id = args.get('choir_id')
+        song_id = args.get('song_id')
+        part_id = args.get('part_id', None)
+        status = args.get('status', 'new')
 
         # pass the apikey in the URL
         params = { 'apikey': api_key }

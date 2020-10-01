@@ -165,10 +165,14 @@ def main(args):
         offsets = np.array(offsets)
         if len(offsets):
 
-            uniques, counts = np.unique(offsets, return_counts=True)
+            resolutions = [5,10,20]
 
-            best_offset = uniques[np.argmax(counts)]
-            offset_ms = int(times[best_offset])
+            bin_range = None
+            for res in resolutions:
+                hist_counts, hist_values = np.histogram([times[o] for o in offsets], bins=res, range=bin_range)
+                am = np.argmax(hist_counts)
+                bin_range = [hist_values[am], hist_values[am+1]]
+                offset_ms = int(hist_values[am])
         else:
             offset_ms = 0
         print(f"Offset: {offset_ms}")

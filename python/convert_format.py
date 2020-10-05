@@ -72,6 +72,7 @@ def main(args):
         stream = ffmpeg.input(get_input_url(key),
                               seekable=0)
         audio = stream.audio
+        audio = audio.filter('pan', '1c|c0=0.5*c0+0.5*c1')
         audio = audio.filter('volumedetect')
         pipeline = ffmpeg.output(audio,
                                  "-",
@@ -134,6 +135,7 @@ def main(args):
 
     if audio_present:
         audio = stream.audio
+        audio = audio.filter('pan', '1c|c0=0.5*c0+0.5*c1')
 
         # If the normalisation appears to detect no sound then just mute audio
         if mute:

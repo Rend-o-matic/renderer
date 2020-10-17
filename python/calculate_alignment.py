@@ -10,6 +10,8 @@ from urllib.parse import urljoin
 from scipy.signal import argrelextrema, find_peaks
 from surfboard.sound import Waveform
 
+from sklearn.cluster import MeanShift
+
 import matplotlib
 matplotlib.use('Agg')
 import matplotlib.pyplot as plt
@@ -20,7 +22,7 @@ import requests
 from choirless_lib import create_cos_client, mqtt_status
 
 SAMPLE_RATE = 44100
-HOP_LENGTH = 512
+HOP_LENGTH_SECONDS = 0.01
 
 
 @mqtt_status()
@@ -138,8 +140,13 @@ def main(args):
         offsets = []
         lookahead_ms = 100
         lookbehind_ms = 400
+        min_std = 0.02
+
+        window_length = int(10 / HOP_LENGTH_SECONDS)
+        window_step = int(window_length / 5)
 
         offsets = []
+        all_errors = []
         potential_offsets = np.arange(int(ms_to_frames(-lookahead_ms, SAMPLE_RATE)),
                                       int(ms_to_frames(lookbehind_ms, SAMPLE_RATE)))
 
@@ -149,42 +156,55 @@ def main(args):
         # Measure error of different offsets
         for start in range(0, len(map_sf0)-1000, 200):
             try:
-                offset, err, errors = find_offset(map_sf0[start:start+1000], map_sf1[start:start+1000], potential_offsets)
-                offsets.append(offset)
-                plt.plot(times, errors)
+                offset, err, std, mean, dip, errors = find_offset(map_sf0[start:start+window_length],
+                                                                  map_sf1[start:start+1000],
+                                                                  potential_offsets)
+                offsets.append((offset, err, mean, std, dip))
+                all_errors.append(errors)
             except ValueError:
                 pass
 
             try:
-                offset, err, errors = find_offset(map_cf0[start:start+1000], map_cf1[start:start+1000], potential_offsets)
-                offsets.append(offset)
-                plt.plot(times, errors)
+                offset, err, std, mean, dip, errors = find_offset(map_cf0[start:start+window_length],
+                                                                  map_cf1[start:start+1000],
+                                                                  potential_offsets)
+                offsets.append((offset, err, mean, std, dip))
+                all_errors.append(errors)
             except ValueError:
                 pass
 
-        offsets = np.array(offsets)
-        if len(offsets):
+        offsets_errors = list(zip(offsets, all_errors))
+        offsets_errors = sorted(offsets_errors, key=lambda x: x[0][4], reverse=True)
+        num = len(offsets_errors) // 10
 
-            resolutions = [5,10,20]
+        # Plot all the lines we are *not* considering
+        for offset, error in offsets_errors[num:]:
+            plt.plot(times, error, color='lightgrey')
 
-            bin_range = None
-            for res in resolutions:
-                hist_counts, hist_values = np.histogram([times[o] for o in offsets], bins=res, range=bin_range)
-                am = np.argmax(hist_counts)
-                bin_range = [hist_values[am], hist_values[am+1]]
-                offset_ms = int(hist_values[am])
-        else:
-            offset_ms = 0
-        print(f"Offset: {offset_ms}")
+        # Plot all the lines are are considering
+        candidate_offsets = []
+        for offset, error in offsets_errors[:num]:
+            plt.plot(times, error)
+            candidate_offsets.append(offset[0])
+
+        # Calculate the clusters of minimums and find the largest cluster
+        clustering = MeanShift(bandwidth=2).fit(np.array(candidate_offsets).reshape(-1, 1))
+        uniques, counts = np.unique(clustering.labels_.flatten(), return_counts=True)
+        biggest_cluster = uniques[np.argmax(counts)]
+        offset_ms = times[int(clustering.cluster_centers_[biggest_cluster])]
+
+        # Plot the cluster centres
+        for i, centre in enumerate(clustering.cluster_centers_):
+            color = 'r' if i == biggest_cluster else 'grey'
+            plt.axvline(x=times[int(centre)], color=color, linestyle='--')
 
         # Plot the output
-        plt.axvline(x=offset_ms, color='r', linestyle='--')
         plt.title(f'Alignment: {rendition_key}')
         plt.ylabel('difference')
         plt.xlabel(f'milliseconds behind: {reference_key}')
 
         x_bounds = plt.xlim()
-        plt.annotate(text=f'{offset_ms} ms', 
+        plt.annotate(text=f'{offset_ms:.0f} ms',
                      xy =(((offset_ms-x_bounds[0])/(x_bounds[1]-x_bounds[0])),0.99), 
                      xycoords='axes fraction', verticalalignment='top', 
                      horizontalalignment='left' , rotation = 270)
@@ -279,11 +299,15 @@ def find_offset(x0, x1, offsets):
     minidx = np.argmin(errors)
     best_offset = minidx
     best_error = errors[minidx]
+    std = np.std(errors)
+    mean = np.mean(errors)
+    dip = ((errors[0] + errors[-1]) / 2) - best_error
 
     if error0 <= best_error:
-        return 0, error0, errors
+        return 0, error0, 0, error0, 0, errors
     else:
-        return best_offset, best_error, errors
+        return best_offset, best_error, std, mean, dip, errors
+
 
 # function to measure two waveforms with one offset by a certian amount
 def measure_error(x0, x1, offset):

@@ -175,7 +175,7 @@ def main(args):
 
         offsets_errors = list(zip(offsets, all_errors))
         offsets_errors = sorted(offsets_errors, key=lambda x: x[0][4], reverse=True)
-        num = len(offsets_errors) // 10
+        num = max(len(offsets_errors) // 10, 5)
 
         # Plot all the lines we are *not* considering
         for offset, error in offsets_errors[num:]:
@@ -187,16 +187,20 @@ def main(args):
             plt.plot(times, error)
             candidate_offsets.append(offset[0])
 
-        # Calculate the clusters of minimums and find the largest cluster
-        clustering = MeanShift(bandwidth=2).fit(np.array(candidate_offsets).reshape(-1, 1))
-        uniques, counts = np.unique(clustering.labels_.flatten(), return_counts=True)
-        biggest_cluster = uniques[np.argmax(counts)]
-        offset_ms = times[int(clustering.cluster_centers_[biggest_cluster])]
+        if candidate_offsets:
+            # Calculate the clusters of minimums and find the largest cluster
+            clustering = MeanShift(bandwidth=3).fit(np.array(candidate_offsets).reshape(-1, 1))
+            uniques, counts = np.unique(clustering.labels_.flatten(), return_counts=True)
+            biggest_cluster = uniques[np.argmax(counts)]
+            offset_ms = times[int(clustering.cluster_centers_[biggest_cluster])]
 
-        # Plot the cluster centres
-        for i, centre in enumerate(clustering.cluster_centers_):
-            color = 'r' if i == biggest_cluster else 'grey'
-            plt.axvline(x=times[int(centre)], color=color, linestyle='--')
+            # Plot the cluster centres
+            for i, centre in enumerate(clustering.cluster_centers_):
+                color = 'r' if i == biggest_cluster else 'grey'
+                plt.axvline(x=times[int(centre)], color=color, linestyle='--')
+        else:
+            print("No candidate offsets found")
+            offset_ms = 0
 
         # Plot the output
         plt.title(f'Alignment: {rendition_key}')
@@ -301,7 +305,8 @@ def find_offset(x0, x1, offsets):
     best_error = errors[minidx]
     std = np.std(errors)
     mean = np.mean(errors)
-    dip = ((errors[0] + errors[-1]) / 2) - best_error
+#    dip = ((errors[0] + errors[-1]) / 2) - best_error
+    dip = mean - best_error
 
     if error0 <= best_error:
         return 0, error0, 0, error0, 0, errors

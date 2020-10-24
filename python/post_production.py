@@ -70,31 +70,6 @@ def main(args):
     # Create a temp dir for our files to use
     with tempfile.TemporaryDirectory() as tmpdir:
 
-        stream = ffmpeg.input(get_input_url(key),
-                              seekable=0,
-                              thread_queue_size=64)
-
-        audio = stream.audio
-        video = stream.video
-
-        # Pad the video to final size, place video in center
-        output_width, output_height = output_spec['size']
-        video = video.filter('pad',
-                             x=-1,
-                             y=-1,
-                             width=output_width,
-                             height=output_height)
-        
-        # Overlay the watermark if present
-        watermark_file = output_spec.get('watermark')
-        if watermark_file:
-            watermark_url = get_misc_url(watermark_file)
-            watermark = ffmpeg.input(watermark_url,
-                                     seekable=0)
-            video = video.overlay(watermark,
-                                  x='W-w-20',
-                                  y='H-h-20')
-             
         print("Doing first pass")
         stream = ffmpeg.input(get_input_url(key),
                               seekable=0)
@@ -149,6 +124,27 @@ def main(args):
         print("Doing second pass loudnorm")
         stream = ffmpeg.input(get_input_url(key),
                               seekable=0)
+
+        video = stream.video
+        audio = stream.audio
+
+        # Pad the video to final size, place video in center
+        output_width, output_height = output_spec['size']
+        video = video.filter('pad',
+                             x=-1,
+                             y=-1,
+                             width=output_width,
+                             height=output_height)
+
+        # Overlay the watermark if present
+        watermark_file = output_spec.get('watermark')
+        if watermark_file:
+            watermark_url = get_misc_url(watermark_file)
+            watermark = ffmpeg.input(watermark_url,
+                                     seekable=0)
+            video = video.overlay(watermark,
+                                  x='W-w-20',
+                                  y='H-h-20')
 
         print("Volume gain to apply:", volume_gain)
         audio = audio.filter('volume',

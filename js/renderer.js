@@ -34,6 +34,7 @@ const main = async (opts) => {
   const margin = parseInt(opts.margin) || 10
   const center = opts.center || true
   const name = opts.name || 'auto'
+  const partNameIds = opts.partNameIds ? opts.partNameIds.split(',') : undefined
 
   // COS
   opts.COS_ENDPOINT = opts.COS_ENDPOINT || opts.endpoint || 'https://s3.eu-gb.cloud-object-storage.appdomain.cloud'
@@ -72,6 +73,11 @@ const main = async (opts) => {
     const hiddenParts = []
     for (var i in response.parts) {
       const p = response.parts[i]
+
+      if (partNameIds && !partNameIds.includes(p.partNameId)) {
+	continue
+      }
+
       if (!p.aspectRatio) {
         p.aspectRatio = '640:480'
       }

@@ -101,7 +101,7 @@ package:
 # Actions
 actions: convert_format calculate_alignment trim_clip \
 	 renderer renderer_compositor_main renderer_compositor_child renderer_final \
-	 snapshot delete_handler post_production
+	 snapshot delete_handler post_production renderer_status
 
 # Convert format
 convert_format:
@@ -123,6 +123,11 @@ renderer:
 	ibmcloud fn action update choirless/renderer js/renderer.js \
 	 --docker $(NODEJS_IMAGE) --memory 2048 -t 600000 \
 	 --web true --web-secure $(RENDERER_KEY)
+
+# Renderer status
+renderer_status:
+	ibmcloud fn action update choirless/renderer_status python/renderer_status.py \
+	 --docker $(PYTHON_IMAGE)
 
 # Renderer main process
 renderer_compositor_main:
@@ -159,11 +164,27 @@ post_production:
 	 --docker $(PYTHON_IMAGE) --timeout 600000 --memory 2048
 
 
-sequences: calc_and_render
+sequences: calc_and_render snapshot_seq convert_format_seq renderer_final_seq post_production_seq
 
-# Calc alignment and kick of render of json definition
+# Calc alignment and kick of render of json definition, then update status
 calc_and_render:
-	ibmcloud fn action update choirless/calc_and_render --sequence choirless/calculate_alignment,choirless/renderer
+	ibmcloud fn action update choirless/calc_and_render --sequence choirless/calculate_alignment,choirless/renderer,choirless/renderer_status
+
+# take snapshot image of a raw video, then update the status
+snapshot_seq:
+	ibmcloud fn action update choirless/snapshot_seq --sequence choirless/snapshot,choirless/renderer_status
+
+# convert format of raw upload video, then update the status
+convert_format_seq:
+	ibmcloud fn action update choirless/convert_format_seq --sequence choirless/convert_format,choirless/renderer_status
+
+# composite the child videos (when they are all present), then update the status
+renderer_final_seq:
+	ibmcloud fn action update choirless/renderer_final_seq --sequence choirless/renderer_final,choirless/renderer_status
+
+# post-produce the final video, then update the status
+post_production_seq:
+	ibmcloud fn action update choirless/post_production_seq --sequence choirless/renderer_final,choirless/renderer_status
 
 triggers: bucket_raw_upload_trigger bucket_converted_upload_trigger \
 	  bucket_definition_upload_trigger \
@@ -213,7 +234,7 @@ rules: bucket_raw_upload_rule bucket_converted_upload_rule \
 
 # Upload to raw bucket
 bucket_raw_upload_rule:
-	ibmcloud fn rule update bucket_raw_upload_rule bucket_raw_upload_trigger choirless/convert_format
+	ibmcloud fn rule update bucket_raw_upload_rule bucket_raw_upload_trigger choirless/convert_format_seq
 
 # Upload to converted bucket
 bucket_converted_upload_rule:
@@ -225,11 +246,11 @@ bucket_definition_upload_rule:
 
 # Upload to final parts bucket
 bucket_final_parts_upload_rule:
-	ibmcloud fn rule update bucket_final_parts_upload_rule bucket_final_parts_upload_trigger choirless/renderer_final
+	ibmcloud fn rule update bucket_final_parts_upload_rule bucket_final_parts_upload_trigger choirless/renderer_final_seq
 
 # Upload to pre-prod bucket
 bucket_preprod_upload_rule:
-	ibmcloud fn rule update bucket_preprod_upload_rule bucket_preprod_upload_trigger choirless/post_production
+	ibmcloud fn rule update bucket_preprod_upload_rule bucket_preprod_upload_trigger choirless/post_production_seq
 
 # Upload to preview bucket
 bucket_preview_upload_rule:
@@ -237,7 +258,7 @@ bucket_preview_upload_rule:
 
 # Upload to raw snapshot rule
 bucket_raw_snapshot_rule:
-	ibmcloud fn rule update bucket_raw_snapshot_rule bucket_raw_upload_trigger choirless/snapshot
+	ibmcloud fn rule update bucket_raw_snapshot_rule bucket_raw_upload_trigger choirless/snapshot_seq
 
 # Delete from raw bucket
 bucket_raw_delete_rule:

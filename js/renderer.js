@@ -156,7 +156,7 @@ const main = async (opts) => {
     const key = [choirId, songId, name].join('+') + '.json'
     await cos.putObject({ Bucket: opts.definition_bucket, Key: key, Body: JSON.stringify(output) }).promise()
     console.log('written key', key)
-    return { ok: true }
+    return { ok: true, choir_id: choirId, song_id: songId, status: 'aligned' }
   } else {
     console.log('Nothing to do')
     return { ok: false }

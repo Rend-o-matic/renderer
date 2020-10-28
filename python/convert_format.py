@@ -17,6 +17,7 @@ def main(args):
 
     notification = args.get('notification', {})
     key = args.get('key', notification.get('object_name', ''))
+    choir_id, song_id, part_id = Path(key).stem.split('.')[0].split('+')
 
     src_bucket = args['raw_bucket']
     dst_bucket = args['converted_bucket']
@@ -171,7 +172,11 @@ def main(args):
     ret = {'status': 'ok',
            'render_time': int(t2-t1),
            'src_key': key,
-           'dst_key': output_key
+           'dst_key': output_key,
+           'choir_id': choir_id,
+           'song_id': song_id,
+           'part_id': part_id,
+           'status': 'converted'
            }
 
     return ret

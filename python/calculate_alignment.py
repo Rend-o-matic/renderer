@@ -7,7 +7,7 @@ import re
 import tempfile
 from pathlib import Path
 from urllib.parse import urljoin
-from scipy.signal import argrelextrema, find_peaks
+from scipy.signal import find_peaks
 from surfboard.sound import Waveform
 
 from sklearn.cluster import MeanShift
@@ -110,6 +110,7 @@ def main(args):
     sound0 = Waveform(signal=s0, sample_rate=sr0)
     sound1 = Waveform(signal=s1, sample_rate=sr1)
 
+
     try:
         # Calculate the features
         sf0 = sound0.spectral_flux()[0]
@@ -123,10 +124,10 @@ def main(args):
         prom_cf0 = calc_prominence_threshold(cf0)
         prom_cf1 = calc_prominence_threshold(cf1)
 
-        peaks_sf0 = calc_get_peaks(sf0, prom_sf0)
-        peaks_sf1 = calc_get_peaks(sf1, prom_sf1)
-        peaks_cf0 = calc_get_peaks(cf0, prom_cf0)
-        peaks_cf1 = calc_get_peaks(cf1, prom_cf1)
+        peaks_sf0, _ = calc_peaks(sf0, prom_sf0)
+        peaks_sf1, _ = calc_peaks(sf1, prom_sf1)
+        peaks_cf0, _ = calc_peaks(cf0, prom_cf0)
+        peaks_cf1, _ = calc_peaks(cf1, prom_cf1)
 
         map_sf0 = map_peaks(peaks_sf0, len(sf0))
         map_sf1 = map_peaks(peaks_sf1, len(sf1))
@@ -139,14 +140,15 @@ def main(args):
         # Acutally calc the offset
         offsets = []
         lookahead_ms = 100
-        lookbehind_ms = 400
+        lookbehind_ms = 500
         min_std = 0.02
 
         window_length = int(10 / HOP_LENGTH_SECONDS)
         window_step = int(window_length / 5)
 
-        offsets = []
-        all_errors = []
+        results = []
+        all_peaks = []
+
         potential_offsets = np.arange(int(ms_to_frames(-lookahead_ms, SAMPLE_RATE)),
                                       int(ms_to_frames(lookbehind_ms, SAMPLE_RATE)))
 
@@ -156,51 +158,51 @@ def main(args):
         # Measure error of different offsets
         for start in range(0, len(map_sf0)-1000, 200):
             try:
-                offset, err, std, mean, dip, errors = find_offset(map_sf0[start:start+window_length],
-                                                                  map_sf1[start:start+1000],
-                                                                  potential_offsets)
-                offsets.append((offset, err, mean, std, dip))
-                all_errors.append(errors)
+                errors = calc_errors(map_sf0[start:start+window_length],
+                                     map_sf1[start:start+1000],
+                                     potential_offsets)
+                peaks, prominences = calc_peaks(-errors)
+
+                if len(peaks):
+                    results.append({'peaks': peaks,
+                                    'prominence': max(prominences),
+                                    'errors': errors})
             except ValueError:
                 pass
 
             try:
-                offset, err, std, mean, dip, errors = find_offset(map_cf0[start:start+window_length],
-                                                                  map_cf1[start:start+1000],
-                                                                  potential_offsets)
-                offsets.append((offset, err, mean, std, dip))
-                all_errors.append(errors)
+                errors = calc_errors(map_sf0[start:start+window_length],
+                                     map_sf1[start:start+1000],
+                                     potential_offsets)
+                peaks, prominences = calc_peaks(-errors)
+
+                if len(peaks):
+                    results.append({'peaks': peaks,
+                                    'prominence': max(prominences),
+                                    'errors': errors})
             except ValueError:
                 pass
 
-        offsets_errors = list(zip(offsets, all_errors))
-        offsets_errors = sorted(offsets_errors, key=lambda x: x[0][4], reverse=True)
-        num = max(len(offsets_errors) // 10, 5)
+        results.sort(key=lambda x: x['prominence'])
 
-        # Plot all the lines we are *not* considering
-        for offset, error in offsets_errors[num:]:
-            plt.plot(times, error, color='lightgrey')
+        num_res = 20
 
-        # Plot all the lines are are considering
-        candidate_offsets = []
-        for offset, error in offsets_errors[:num]:
-            plt.plot(times, error)
-            candidate_offsets.append(offset[0])
+        for result in results[:-num_res]:
+            plt.plot(times, result['errors'], alpha=0.1)
 
-        if candidate_offsets:
-            # Calculate the clusters of minimums and find the largest cluster
-            clustering = MeanShift(bandwidth=3).fit(np.array(candidate_offsets).reshape(-1, 1))
-            uniques, counts = np.unique(clustering.labels_.flatten(), return_counts=True)
-            biggest_cluster = uniques[np.argmax(counts)]
-            offset_ms = times[int(clustering.cluster_centers_[biggest_cluster])]
+        for result in results[-num_res:]:
+            plt.plot(times, result['errors'])
+            all_peaks.extend(result['peaks'])
 
-            # Plot the cluster centres
-            for i, centre in enumerate(clustering.cluster_centers_):
-                color = 'r' if i == biggest_cluster else 'grey'
-                plt.axvline(x=times[int(centre)], color=color, linestyle='--')
-        else:
-            print("No candidate offsets found")
-            offset_ms = 0
+        clustering = MeanShift(bandwidth=3).fit(np.array(all_peaks).reshape(-1, 1))
+        uniques, counts = np.unique(clustering.labels_.flatten(), return_counts=True)
+        biggest_cluster = uniques[np.argmax(counts)]
+        offset_ms = times[int(clustering.cluster_centers_[biggest_cluster])]
+
+        # Plot the cluster centres
+        for i, centre in enumerate(clustering.cluster_centers_):
+            color = 'r' if i == biggest_cluster else 'grey'
+            plt.axvline(x=times[int(centre)], color=color, linestyle='--')
 
         # Plot the output
         plt.title(f'Alignment: {rendition_key}')
@@ -265,17 +267,22 @@ def frames_to_ms(frames, sr):
     return ((frames * 512) / sr) * 1000
 
 
+def calc_prominences(signal):
+    _, properties = find_peaks(signal, prominence=0)
+    return properties.get("prominences", [])
+
+
 def calc_prominence_threshold(signal):
-    peaks, properties = find_peaks(signal, prominence=0)
-    if len(peaks) == 0:
+    prominences = calc_prominences(signal)
+    if len(prominences) == 0:
         return 0
-    prominence = np.quantile(properties["prominences"], 0.9)
+    prominence = np.quantile(prominences, 0.9)
     return prominence
 
 
-def calc_get_peaks(signal, prominence):
-    peaks, _ = find_peaks(signal, prominence=prominence)
-    return peaks
+def calc_peaks(signal, prominence=0):
+    peaks, properties = find_peaks(signal, prominence=prominence)
+    return peaks, properties.get('prominences', [])
 
 
 def map_peaks(peaks, length):
@@ -291,27 +298,9 @@ def map_peaks(peaks, length):
     return data
 
 
-# Find the best offset
-def find_offset(x0, x1, offsets):
-
-    error0 = measure_error(x0, x1, 0)
+def calc_errors(x0, x1, offsets):
     errors = np.array([measure_error(x0, x1, int(-offset)) for offset in offsets])
-
-    if all(e == errors[0] for e in errors):
-        raise ValueError("Errors flat")
-
-    minidx = np.argmin(errors)
-    best_offset = minidx
-    best_error = errors[minidx]
-    std = np.std(errors)
-    mean = np.mean(errors)
-#    dip = ((errors[0] + errors[-1]) / 2) - best_error
-    dip = mean - best_error
-
-    if error0 <= best_error:
-        return 0, error0, 0, error0, 0, errors
-    else:
-        return best_offset, best_error, std, mean, dip, errors
+    return errors
 
 
 # function to measure two waveforms with one offset by a certian amount

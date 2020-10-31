@@ -110,15 +110,81 @@ def main(args):
     sound0 = Waveform(signal=s0, sample_rate=sr0)
     sound1 = Waveform(signal=s1, sample_rate=sr1)
 
+    # Calculate the features
+    sf0 = sound0.spectral_flux()[0]
+    cf0 = sound0.crest_factor()[0]
+
+    sf1 = sound1.spectral_flux()[0]
+    cf1 = sound1.crest_factor()[0]
+
+    features = {'s0': s0,
+                's1': s1,
+                'sf0': sf0,
+                'sf1': sf1,
+                'cf0': cf0,
+                'cf1': cf1,
+                }
+
+    offset_ms = calc_offset(features, debug=True)
+
+    # Plot the output
+    plt.title(f'Alignment: {rendition_key}')
+    plt.ylabel('difference')
+    plt.xlabel(f'milliseconds behind: {reference_key}')
+
+    x_bounds = plt.xlim()
+    plt.annotate(text=f'{offset_ms:.0f} ms',
+                 xy =(((offset_ms-x_bounds[0])/(x_bounds[1]-x_bounds[0])),0.99),
+                 xycoords='axes fraction', verticalalignment='top',
+                 horizontalalignment='left' , rotation = 270)
+
+    # Upload the plot
+    with tempfile.TemporaryDirectory() as tmpdir:
+        key = f'{choir_id}+{song_id}+{part_id}-alignment.png'
+        file_path = str(Path(tmpdir, key))
+        plt.savefig(file_path)
+        cos.upload_file(file_path, debug_bucket, key)
+
+    # If the offset is too great, assume we failed and fallback to zero
+    if offset_ms > 700 or offset_ms < -700:
+        print(f"Offset was too great ({offset}) so falling back to zero")
+        offset_ms = 0
+
+    # Save the offest to the API so we can trim on it later
+    try:
+        api_url = args['CHOIRLESS_API_URL']
+        api_key = args['CHOIRLESS_API_KEY']
+
+        params = {'apikey': api_key}
+        payload = {'choirId': choir_id,
+                   'songId': song_id,
+                   'partId': part_id,
+                   'offset': offset_ms}
+        resp = requests.post(urljoin(api_url, 'choir/songpart'),
+                             params=params,
+                             json=payload)
+        resp.raise_for_status()
+
+    except Exception as e:
+        print(f"Could not store offset in API: choidId {choir_id} songId {song_id} partId {part_id} offset {offset_ms}")
+
+    ret = {"offset":  offset_ms,
+           "key": rendition_key,
+           "rendition_key": rendition_key,
+           "reference_key": reference_key,
+    }
+
+    return ret
+
+
+def calc_offset(features, debug=False):
+
+    sf0 = features['sf0']
+    cf0 = features['cf0']
+    sf1 = features['sf1']
+    cf1 = features['cf1']
 
     try:
-        # Calculate the features
-        sf0 = sound0.spectral_flux()[0]
-        cf0 = sound0.crest_factor()[0]
-
-        sf1 = sound1.spectral_flux()[0]
-        cf1 = sound1.crest_factor()[0]
-
         prom_sf0 = calc_prominence_threshold(sf0)
         prom_sf1 = calc_prominence_threshold(sf1)
         prom_cf0 = calc_prominence_threshold(cf0)
@@ -135,7 +201,8 @@ def main(args):
         map_cf1 = map_peaks(peaks_cf1, len(cf1))
 
         # Set up a chart to plot sync process
-        plt.figure(figsize=(20, 6))
+        if debug:
+            plt.figure(figsize=(20, 6))
 
         # Acutally calc the offset
         offsets = []
@@ -187,11 +254,13 @@ def main(args):
 
         num_res = 20
 
-        for result in results[:-num_res]:
-            plt.plot(times, result['errors'], alpha=0.1)
+        if debug:
+            for result in results[:-num_res]:
+                plt.plot(times, result['errors'], alpha=0.1)
 
         for result in results[-num_res:]:
-            plt.plot(times, result['errors'])
+            if debug:
+                plt.plot(times, result['errors'])
             all_peaks.extend(result['peaks'])
 
         clustering = MeanShift(bandwidth=3).fit(np.array(all_peaks).reshape(-1, 1))
@@ -200,64 +269,18 @@ def main(args):
         offset_ms = times[int(clustering.cluster_centers_[biggest_cluster])]
 
         # Plot the cluster centres
-        for i, centre in enumerate(clustering.cluster_centers_):
-            color = 'r' if i == biggest_cluster else 'grey'
-            plt.axvline(x=times[int(centre)], color=color, linestyle='--')
-
-        # Plot the output
-        plt.title(f'Alignment: {rendition_key}')
-        plt.ylabel('difference')
-        plt.xlabel(f'milliseconds behind: {reference_key}')
-
-        x_bounds = plt.xlim()
-        plt.annotate(text=f'{offset_ms:.0f} ms',
-                     xy =(((offset_ms-x_bounds[0])/(x_bounds[1]-x_bounds[0])),0.99), 
-                     xycoords='axes fraction', verticalalignment='top', 
-                     horizontalalignment='left' , rotation = 270)
-
-        # Upload the plot
-        with tempfile.TemporaryDirectory() as tmpdir:
-            key = f'{choir_id}+{song_id}+{part_id}-alignment.png'
-            file_path = str(Path(tmpdir, key))
-            plt.savefig(file_path)
-            cos.upload_file(file_path, debug_bucket, key)
+        if debug:
+            for i, centre in enumerate(clustering.cluster_centers_):
+                color = 'r' if i == biggest_cluster else 'grey'
+                plt.axvline(x=times[int(centre)], color=color, linestyle='--')
 
     except Exception as e:
         raise
         print("Could not sync audio", e)
         offset_ms = 0
 
-    # If the offset is too great, assume we failed and fallback to zero
-    if offset_ms > 700 or offset_ms < -700:
-        print(f"Offset was too great ({offset}) so falling back to zero")
-        offset_ms = 0
-
-    # Save the offest to the API so we can trim on it later
-    try:
-        api_url = args['CHOIRLESS_API_URL']
-        api_key = args['CHOIRLESS_API_KEY']
-
-        params = {'apikey': api_key}
-        payload = {'choirId': choir_id,
-                   'songId': song_id,
-                   'partId': part_id,
-                   'offset': offset_ms}
-        resp = requests.post(urljoin(api_url, 'choir/songpart'),
-                             params=params,
-                             json=payload)
-        resp.raise_for_status()
-
-    except Exception as e:
-        print(f"Could not store offset in API: choidId {choir_id} songId {song_id} partId {part_id} offset {offset_ms}")
-
-    ret = {"offset":  offset_ms,
-           "key": rendition_key,
-           "rendition_key": rendition_key,
-           "reference_key": reference_key,
-    }
+    return offset_ms
     
-    return ret
-
 
 def ms_to_frames(ms, sr):
     return ((ms / 1000) * sr) / 512

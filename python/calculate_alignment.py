@@ -5,6 +5,7 @@ import librosa
 import numpy as np
 import re
 import tempfile
+from collections import defaultdict
 from pathlib import Path
 from urllib.parse import urljoin
 from scipy.signal import find_peaks
@@ -177,7 +178,7 @@ def main(args):
     return ret
 
 
-def calc_offset(features, debug=False, q=0.9, decay=0.8, num_res=20, bandwidth=3):
+def calc_offset(features, debug=False, q=0.9, decay=0.8, num_res=20, bandwidth=3, base_score=0):
 
     sf0 = features['sf0']
     cf0 = features['cf0']
@@ -190,10 +191,10 @@ def calc_offset(features, debug=False, q=0.9, decay=0.8, num_res=20, bandwidth=3
         prom_cf0 = calc_prominence_threshold(cf0, q)
         prom_cf1 = calc_prominence_threshold(cf1, q)
 
-        peaks_sf0, _ = calc_peaks(sf0, prom_sf0)
-        peaks_sf1, _ = calc_peaks(sf1, prom_sf1)
-        peaks_cf0, _ = calc_peaks(cf0, prom_cf0)
-        peaks_cf1, _ = calc_peaks(cf1, prom_cf1)
+        peaks_sf0, _, _ = calc_peaks(sf0, prom_sf0)
+        peaks_sf1, _, _ = calc_peaks(sf1, prom_sf1)
+        peaks_cf0, _, _ = calc_peaks(cf0, prom_cf0)
+        peaks_cf1, _, _ = calc_peaks(cf1, prom_cf1)
 
         map_sf0 = map_peaks(peaks_sf0, len(sf0), decay)
         map_sf1 = map_peaks(peaks_sf1, len(sf1), decay)
@@ -227,10 +228,11 @@ def calc_offset(features, debug=False, q=0.9, decay=0.8, num_res=20, bandwidth=3
                 errors = calc_errors(map_sf0[start:start+window_length],
                                      map_sf1[start:start+1000],
                                      potential_offsets)
-                peaks, prominences = calc_peaks(-errors)
+                peaks, prominences, heights = calc_peaks(-errors)
 
                 if len(peaks):
                     results.append({'peaks': peaks,
+                                    'heights': -heights,
                                     'prominence': max(prominences),
                                     'errors': errors})
             except ValueError:
@@ -240,10 +242,11 @@ def calc_offset(features, debug=False, q=0.9, decay=0.8, num_res=20, bandwidth=3
                 errors = calc_errors(map_cf0[start:start+window_length],
                                      map_cf1[start:start+1000],
                                      potential_offsets)
-                peaks, prominences = calc_peaks(-errors)
+                peaks, prominences, heights = calc_peaks(-errors)
 
                 if len(peaks):
                     results.append({'peaks': peaks,
+                                    'heights': -heights,
                                     'prominence': max(prominences),
                                     'errors': errors})
             except ValueError:
@@ -258,11 +261,21 @@ def calc_offset(features, debug=False, q=0.9, decay=0.8, num_res=20, bandwidth=3
         for result in results[-num_res:]:
             if debug:
                 plt.plot(times, result['errors'])
-            all_peaks.extend(result['peaks'])
+            peaks = tuple(zip(result['peaks'], result['heights']))
+            all_peaks.extend(peaks)
 
-        clustering = MeanShift(bandwidth=bandwidth).fit(np.array(all_peaks).reshape(-1, 1))
-        uniques, counts = np.unique(clustering.labels_.flatten(), return_counts=True)
-        biggest_cluster = uniques[np.argmax(counts)]
+        all_peaks = np.array(all_peaks)
+        clustering = MeanShift(bandwidth=bandwidth).fit(np.array(all_peaks[:,0]).reshape(-1, 1))
+        labels = clustering.labels_.flatten()
+        scores = defaultdict(lambda: 0)
+        for i, (peak, height) in enumerate(all_peaks):
+            label = labels[i]
+            scores[label] += base_score + height
+
+        scores = list(scores.items())
+        scores = sorted(scores, key=lambda x: x[1], reverse=True)
+
+        biggest_cluster = scores[0][0]
         offset_ms = times[int(clustering.cluster_centers_[biggest_cluster])]
 
         # Plot the cluster centres
@@ -300,9 +313,11 @@ def calc_prominence_threshold(signal, q=0.9):
     return prominence
 
 
-def calc_peaks(signal, prominence=0):
-    peaks, properties = find_peaks(signal, prominence=prominence)
-    return peaks, properties.get('prominences', [])
+def calc_peaks(signal, prominence=0, height=-np.inf):
+    peaks, properties = find_peaks(signal, prominence=prominence, height=height)
+    return peaks, \
+        properties.get('prominences', np.array([])), \
+        properties.get('peak_heights', np.array([]))
 
 
 def map_peaks(peaks, length, decay=0.8):

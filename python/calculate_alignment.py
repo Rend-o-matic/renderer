@@ -177,7 +177,7 @@ def main(args):
     return ret
 
 
-def calc_offset(features, debug=False):
+def calc_offset(features, debug=False, q=0.9, decay=0.8, num_res=20, bandwidth=3):
 
     sf0 = features['sf0']
     cf0 = features['cf0']
@@ -185,20 +185,20 @@ def calc_offset(features, debug=False):
     cf1 = features['cf1']
 
     try:
-        prom_sf0 = calc_prominence_threshold(sf0)
-        prom_sf1 = calc_prominence_threshold(sf1)
-        prom_cf0 = calc_prominence_threshold(cf0)
-        prom_cf1 = calc_prominence_threshold(cf1)
+        prom_sf0 = calc_prominence_threshold(sf0, q)
+        prom_sf1 = calc_prominence_threshold(sf1, q)
+        prom_cf0 = calc_prominence_threshold(cf0, q)
+        prom_cf1 = calc_prominence_threshold(cf1, q)
 
         peaks_sf0, _ = calc_peaks(sf0, prom_sf0)
         peaks_sf1, _ = calc_peaks(sf1, prom_sf1)
         peaks_cf0, _ = calc_peaks(cf0, prom_cf0)
         peaks_cf1, _ = calc_peaks(cf1, prom_cf1)
 
-        map_sf0 = map_peaks(peaks_sf0, len(sf0))
-        map_sf1 = map_peaks(peaks_sf1, len(sf1))
-        map_cf0 = map_peaks(peaks_cf0, len(cf0))
-        map_cf1 = map_peaks(peaks_cf1, len(cf1))
+        map_sf0 = map_peaks(peaks_sf0, len(sf0), decay)
+        map_sf1 = map_peaks(peaks_sf1, len(sf1), decay)
+        map_cf0 = map_peaks(peaks_cf0, len(cf0), decay)
+        map_cf1 = map_peaks(peaks_cf1, len(cf1), decay)
 
         # Set up a chart to plot sync process
         if debug:
@@ -208,7 +208,6 @@ def calc_offset(features, debug=False):
         offsets = []
         lookahead_ms = 100
         lookbehind_ms = 500
-        min_std = 0.02
 
         window_length = int(10 / HOP_LENGTH_SECONDS)
         window_step = int(window_length / 5)
@@ -238,8 +237,8 @@ def calc_offset(features, debug=False):
                 pass
 
             try:
-                errors = calc_errors(map_sf0[start:start+window_length],
-                                     map_sf1[start:start+1000],
+                errors = calc_errors(map_cf0[start:start+window_length],
+                                     map_cf1[start:start+1000],
                                      potential_offsets)
                 peaks, prominences = calc_peaks(-errors)
 
@@ -252,8 +251,6 @@ def calc_offset(features, debug=False):
 
         results.sort(key=lambda x: x['prominence'])
 
-        num_res = 20
-
         if debug:
             for result in results[:-num_res]:
                 plt.plot(times, result['errors'], alpha=0.1)
@@ -263,7 +260,7 @@ def calc_offset(features, debug=False):
                 plt.plot(times, result['errors'])
             all_peaks.extend(result['peaks'])
 
-        clustering = MeanShift(bandwidth=3).fit(np.array(all_peaks).reshape(-1, 1))
+        clustering = MeanShift(bandwidth=bandwidth).fit(np.array(all_peaks).reshape(-1, 1))
         uniques, counts = np.unique(clustering.labels_.flatten(), return_counts=True)
         biggest_cluster = uniques[np.argmax(counts)]
         offset_ms = times[int(clustering.cluster_centers_[biggest_cluster])]
@@ -295,11 +292,11 @@ def calc_prominences(signal):
     return properties.get("prominences", [])
 
 
-def calc_prominence_threshold(signal):
+def calc_prominence_threshold(signal, q=0.9):
     prominences = calc_prominences(signal)
     if len(prominences) == 0:
         return 0
-    prominence = np.quantile(prominences, 0.9)
+    prominence = np.quantile(prominences, q)
     return prominence
 
 
@@ -308,15 +305,15 @@ def calc_peaks(signal, prominence=0):
     return peaks, properties.get('prominences', [])
 
 
-def map_peaks(peaks, length):
+def map_peaks(peaks, length, decay=0.8):
     data = np.zeros(length, dtype=np.float32)
     np.put(data, peaks.astype(np.int), 1.0)
 
     for i in range(1, len(data)):
-        data[i] = max(data[i], data[i-1] * 0.8)
+        data[i] = max(data[i], data[i-1] * decay)
 
     for i in range(len(data) - 2, 0, -1):
-        data[i] = max(data[i], data[i+1] * 0.8)
+        data[i] = max(data[i], data[i+1] * decay)
 
     return data
 

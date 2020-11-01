@@ -126,7 +126,13 @@ def main(args):
                 'cf1': cf1,
                 }
 
-    offset_ms = calc_offset(features, debug=True)
+    offset_ms = calc_offset(features,
+                            debug=True,
+                            q=0.9,
+                            decay=0.95,
+                            num_res=41,
+                            bandwidth=5,
+                            base_score=0.7)
 
     # Plot the output
     plt.title(f'Alignment: {rendition_key}')
@@ -208,7 +214,7 @@ def calc_offset(features, debug=False, q=0.9, decay=0.8, num_res=20, bandwidth=3
         # Acutally calc the offset
         offsets = []
         lookahead_ms = 100
-        lookbehind_ms = 500
+        lookbehind_ms = 1000
 
         window_length = int(10 / HOP_LENGTH_SECONDS)
         window_step = int(window_length / 5)
@@ -264,26 +270,29 @@ def calc_offset(features, debug=False, q=0.9, decay=0.8, num_res=20, bandwidth=3
             peaks = tuple(zip(result['peaks'], result['heights']))
             all_peaks.extend(peaks)
 
-        all_peaks = np.array(all_peaks)
-        clustering = MeanShift(bandwidth=bandwidth).fit(np.array(all_peaks[:,0]).reshape(-1, 1))
-        labels = clustering.labels_.flatten()
-        scores = defaultdict(lambda: 0)
-        for i, (peak, height) in enumerate(all_peaks):
-            label = labels[i]
-            scores[label] += base_score + height
+        if len(all_peaks) > 0:
+            all_peaks = np.array(all_peaks)
+            clustering = MeanShift(bandwidth=bandwidth).fit(np.array(all_peaks[:,0]).reshape(-1, 1))
+            labels = clustering.labels_.flatten()
+            scores = defaultdict(lambda: 0)
+            for i, (peak, height) in enumerate(all_peaks):
+                label = labels[i]
+                scores[label] += base_score + height
 
-        scores = list(scores.items())
-        scores = sorted(scores, key=lambda x: x[1], reverse=True)
+            scores = list(scores.items())
+            scores = sorted(scores, key=lambda x: x[1], reverse=True)
 
-        biggest_cluster = scores[0][0]
-        offset_ms = times[int(clustering.cluster_centers_[biggest_cluster])]
-
-        # Plot the cluster centres
-        if debug:
-            for i, centre in enumerate(clustering.cluster_centers_):
-                color = 'r' if i == biggest_cluster else 'grey'
-                plt.axvline(x=times[int(centre)], color=color, linestyle='--')
-
+            biggest_cluster = scores[0][0]
+            offset_ms = times[int(clustering.cluster_centers_[biggest_cluster])]
+            
+            # Plot the cluster centres
+            if debug:
+                for i, centre in enumerate(clustering.cluster_centers_):
+                    color = 'r' if i == biggest_cluster else 'grey'
+                    plt.axvline(x=times[int(centre)], color=color, linestyle='--')
+        else:
+            offset_ms = 0
+                
     except Exception as e:
         raise
         print("Could not sync audio", e)

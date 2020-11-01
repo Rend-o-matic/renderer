@@ -25,6 +25,7 @@ from choirless_lib import create_cos_client, mqtt_status
 SAMPLE_RATE = 44100
 HOP_LENGTH_SECONDS = 0.01
 
+PARAMS = {'bandwidth': 5, 'base_score': 0.6, 'decay': 0.9, 'num_res': 11, 'q': 0.85}
 
 @mqtt_status()
 def main(args):
@@ -128,11 +129,7 @@ def main(args):
 
     offset_ms = calc_offset(features,
                             debug=True,
-                            q=0.9,
-                            decay=0.95,
-                            num_res=41,
-                            bandwidth=5,
-                            base_score=0.7)
+                            **PARAMS)
 
     # Plot the output
     plt.title(f'Alignment: {rendition_key}')
@@ -214,7 +211,7 @@ def calc_offset(features, debug=False, q=0.9, decay=0.8, num_res=20, bandwidth=3
         # Acutally calc the offset
         offsets = []
         lookahead_ms = 100
-        lookbehind_ms = 1000
+        lookbehind_ms = 600
 
         window_length = int(10 / HOP_LENGTH_SECONDS)
         window_step = int(window_length / 5)

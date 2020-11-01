@@ -8,7 +8,7 @@ from itertools import permutations
 from functools import partial
 import json
 
-from calculate_alignment import calc_offset, SAMPLE_RATE
+from calculate_alignment import calc_offset, SAMPLE_RATE, PARAMS as EXISTING_PARAMS
 
 cache_dir = "/Users/matt/Downloads/choirless_videos"
 
@@ -58,8 +58,8 @@ def main():
 
     study = optuna.load_study(study_name='distributed-example', storage='sqlite:///example.db')
 
-    # re-run the best trial as may still be best for any new data
-    study.enqueue_trial(study.best_params)
+    # Start with the existing params as these may still be valid
+    study.enqueue_trial(EXISTING_PARAMS)
 
     study.optimize(ob,
                    n_trials=100,

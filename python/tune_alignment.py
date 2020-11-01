@@ -56,12 +56,11 @@ def main():
     print("Total number of tests: ", len(valid_combos))
     ob = partial(objective, valid_combos, False)
 
-    study = optuna.load_study(study_name='distributed-example', storage='sqlite:///example.db',
-#                              sampler=optuna.samplers.RandomSampler(),
-                              pruner=optuna.pruners.NopPruner(),
-    )
-#    study = optuna.create_study(pruner=optuna.pruners.MedianPruner())
-#    study = optuna.create_study(pruner=optuna.pruners.ThresholdPruner(upper=1.0))
+    study = optuna.load_study(study_name='distributed-example', storage='sqlite:///example.db')
+
+    # re-run the best trial as may still be best for any new data
+    study.enqueue_trial(study.best_params)
+
     study.optimize(ob,
                    n_trials=100,
                    n_jobs=1)

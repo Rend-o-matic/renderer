@@ -36,14 +36,17 @@ def main():
     valid_combos = []
     for song_parts in data.values():
         for a, b in permutations(song_parts, 2):
-#            if a['offset'] < b['offset']:
             if a['offset'] == 0:
                 valid_combos.append([a, b, b['offset'] - a['offset']])
 
 
     ob = partial(objective, valid_combos, False)
-                
-    study = optuna.create_study(pruner=optuna.pruners.MedianPruner())
+
+    study = optuna.load_study(study_name='distributed-example', storage='sqlite:///example.db',
+                              sampler=optuna.samplers.RandomSampler(),
+                              pruner=optuna.pruners.NopPruner(),
+    )
+#    study = optuna.create_study(pruner=optuna.pruners.MedianPruner())
 #    study = optuna.create_study(pruner=optuna.pruners.ThresholdPruner(upper=1.0))
     study.optimize(ob,
                    n_trials=100,
@@ -56,12 +59,12 @@ def main():
                 
 def objective(valid_combos, debug, trial):
     bandwidth = trial.suggest_int('bandwidth', 1, 5)
-    q = trial.suggest_discrete_uniform('q', 0.1, 1.0, 0.05)
-    decay = trial.suggest_discrete_uniform('decay', 0.1, 1.0, 0.05)
-    num_res = trial.suggest_int('num_res', 1, 46, 5)
+    q = trial.suggest_discrete_uniform('q', 0.5, 1.0, 0.05)
+    decay = trial.suggest_discrete_uniform('decay', 0.5, 1.0, 0.05)
+    num_res = trial.suggest_int('num_res', 1, 86, 5)
     base_score= trial.suggest_discrete_uniform('base_score', 0.0, 1.0, 0.05)
 
-    errors = []
+    results = []
     for i, (a, b, actual_offset) in enumerate(valid_combos):
         features = {'sf0': a['sf'],
                     'cf0': a['cf'],
@@ -77,21 +80,21 @@ def objective(valid_combos, debug, trial):
                              base_score=base_score
         )
 
+        diff = abs(actual_offset - offset)
         if debug:
-            print(a['offset'], b['offset'], actual_offset, offset)
-        
-        errors.append((actual_offset - offset) / actual_offset)
-        intermediate_mse = np.mean(np.array(errors) ** 2)
-        trial.report(intermediate_mse, i)
+            print(a['offset'], b['offset'], actual_offset, offset, diff)
+
+        result = 1 if diff <= 50 else 0
+
+        results.append(result)
+        intermediate_result = np.mean(results)
+        trial.report(intermediate_result, i)
 
         # Handle pruning based on the intermediate value.
         if trial.should_prune():
             raise optuna.TrialPruned()
 
-    errors = np.array(errors) ** 2
-    mse = np.mean(errors)
-
-    return mse
+    return np.mean(results)
         
     
 

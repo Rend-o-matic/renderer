@@ -1,0 +1,121 @@
+{
+  "choir_id": "001kGntI3BySFL1RW073095IWV1iMwtc",
+  "song_id": "001kVwvm1Vr9Bz0mV7rH1qg04X3VtvSp",
+  "output": {
+    "size": [
+      1920,
+      1080
+    ],
+    "reverb": 0.1,
+    "reverb_type": "hall",
+    "panning": true,
+    "watermark": "choirless_watermark.png"
+  },
+  "inputs": [
+    {
+      "part_id": "001kYU6d3wkDIs2S17aw2LaARj3SRGt1",
+      "size": [
+        519,
+        389
+      ],
+      "volume": 1,
+      "panning": 0,
+      "offset": 220.58956916099774,
+      "position": [
+        20,
+        146
+      ],
+      "pan": -0.7088541666666667
+    },
+    {
+      "part_id": "001kYqeD3ObLo80F6jv04ePCx93m9fA9",
+      "size": [
+        292,
+        389
+      ],
+      "volume": 1,
+      "panning": 0,
+      "offset": 464.39909297052156,
+      "position": [
+        549,
+        146
+      ],
+      "pan": -0.27604166666666663
+    },
+    {
+      "part_id": "001kVxLR0Fw11348WU9U1PBClj3gNHoH",
+      "size": [
+        519,
+        389
+      ],
+      "volume": 1,
+      "panning": 0,
+      "offset": 0,
+      "position": [
+        851,
+        146
+      ],
+      "pan": 0.1567708333333333
+    },
+    {
+      "part_id": "001kXWQE2fmeh23lrw3O3aeoqg2x5Y4P",
+      "size": [
+        519,
+        389
+      ],
+      "volume": 1,
+      "panning": 0,
+      "offset": 348.29931972789115,
+      "position": [
+        1380,
+        146
+      ],
+      "pan": 0.7078125
+    },
+    {
+      "part_id": "001kZG0p32tZBc3Q6Ckm44wlqC34BsOP",
+      "size": [
+        519,
+        389
+      ],
+      "volume": 1,
+      "panning": 0,
+      "offset": 110,
+      "position": [
+        171,
+        545
+      ],
+      "pan": -0.5515625
+    },
+    {
+      "part_id": "001kYvXE3lMdut1tAPhL3zrGdm3v6Kil",
+      "size": [
+        519,
+        389
+      ],
+      "volume": 0.5,
+      "panning": 0,
+      "offset": 104.48979591836735,
+      "position": [
+        700,
+        545
+      ],
+      "pan": -0.0005208333333333037
+    },
+    {
+      "part_id": "001kXkSn2Xep2V4aPYae47Jomw1Si0Ks",
+      "size": [
+        519,
+        389
+      ],
+      "volume": 1,
+      "panning": 0,
+      "offset": 127.70975056689343,
+      "position": [
+        1229,
+        545
+      ],
+      "pan": 0.5505208333333333
+    }
+  ]
+}

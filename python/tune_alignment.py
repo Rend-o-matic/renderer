@@ -6,44 +6,58 @@ from pathlib import Path
 from collections import defaultdict
 from itertools import permutations
 from functools import partial
+import json
 
 from calculate_alignment import calc_offset, SAMPLE_RATE
+
+cache_dir = "/Users/matt/Downloads/choirless_videos"
 
 def main():
 
     data = defaultdict(list)
     print("Loading audio files")
-    for filename in Path('tune_data').glob('*.wav'):
-        print(filename.name)
-        choir_id, song_id, _, offset = filename.stem.split('+')
-        s, sr = librosa.load(str(filename),
-                             sr=SAMPLE_RATE,
-                             mono=True,
-                             offset=0,
-                             duration=180)
-        sound0 = Waveform(signal=s, sample_rate=sr)
-        sf = sound0.spectral_flux()[0]
-        cf = sound0.crest_factor()[0]
+    for json_file in Path('tune_data').glob('*.json'):
+        spec = json.load(json_file.open())
+        print("Loading JSON file:", json_file.name)
+        choir_id = spec['choir_id']
+        song_id = spec['song_id']
 
-        features = {'s': s,
-                    'sf': sf,
-                    'cf': cf,
-                    'offset': int(offset),
-        }
+        for part in spec['inputs']:
+            part_id = part['part_id']
+            offset = int(part['offset'])
+
+            filename = Path(cache_dir, f'{choir_id}+{song_id}+{part_id}.nut')
+            print("loading:", filename)
+
+            s, sr = librosa.load(str(filename),
+                                 sr=SAMPLE_RATE,
+                                 mono=True,
+                                 offset=0,
+                                 duration=180)
+            sound0 = Waveform(signal=s, sample_rate=sr)
+            sf = sound0.spectral_flux()[0]
+            cf = sound0.crest_factor()[0]
+
+            features = {'s': s,
+                        'sf': sf,
+                        'cf': cf,
+                        'offset': int(offset),
+            }
         
-        data[f'{choir_id}+{song_id}'].append(features)
+            data[f'{choir_id}+{song_id}'].append(features)
 
     valid_combos = []
     for song_parts in data.values():
         for a, b in permutations(song_parts, 2):
             if a['offset'] == 0:
-                valid_combos.append([a, b, b['offset'] - a['offset']])
+                valid_combos.append([a, b, b['offset']])
 
 
+    print("Total number of tests: ", len(valid_combos))
     ob = partial(objective, valid_combos, False)
 
     study = optuna.load_study(study_name='distributed-example', storage='sqlite:///example.db',
-                              sampler=optuna.samplers.RandomSampler(),
+#                              sampler=optuna.samplers.RandomSampler(),
                               pruner=optuna.pruners.NopPruner(),
     )
 #    study = optuna.create_study(pruner=optuna.pruners.MedianPruner())
@@ -64,7 +78,7 @@ def objective(valid_combos, debug, trial):
     num_res = trial.suggest_int('num_res', 1, 86, 5)
     base_score= trial.suggest_discrete_uniform('base_score', 0.0, 1.0, 0.05)
 
-    results = []
+    num_synced = 0
     for i, (a, b, actual_offset) in enumerate(valid_combos):
         features = {'sf0': a['sf'],
                     'cf0': a['cf'],
@@ -84,17 +98,14 @@ def objective(valid_combos, debug, trial):
         if debug:
             print(a['offset'], b['offset'], actual_offset, offset, diff)
 
-        result = 1 if diff <= 50 else 0
+        if diff <= 50:
+            num_synced += 1
 
-        results.append(result)
-        intermediate_result = np.mean(results)
-        trial.report(intermediate_result, i)
+        if not debug:
+            if num_synced == len(valid_combos):
+                trial.study.stop()
 
-        # Handle pruning based on the intermediate value.
-        if trial.should_prune():
-            raise optuna.TrialPruned()
-
-    return np.mean(results)
+    return num_synced
         
     
 

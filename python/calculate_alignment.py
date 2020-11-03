@@ -13,6 +13,8 @@ from surfboard.sound import Waveform
 
 from sklearn.cluster import MeanShift
 
+from pykalman import UnscentedKalmanFilter as KalmanFilter
+
 import matplotlib
 matplotlib.use('Agg')
 import matplotlib.pyplot as plt
@@ -25,7 +27,7 @@ from choirless_lib import create_cos_client, mqtt_status
 SAMPLE_RATE = 44100
 HOP_LENGTH_SECONDS = 0.01
 
-PARAMS = {'bandwidth': 5, 'base_score': 0.6, 'decay': 0.9, 'num_res': 11, 'q': 0.85}
+PARAMS = {'q': 0.93, 'decay': 0.5, 'chroma_weight': 1.0, 'sf_weight': 0.8, 'cf_weight': 0.9}
 
 @mqtt_status()
 def main(args):
@@ -119,16 +121,25 @@ def main(args):
     sf1 = sound1.spectral_flux()[0]
     cf1 = sound1.crest_factor()[0]
 
+    chroma_s0 = np.argmax(sound0.chroma_cqt(), axis=0) / 12
+    chroma_s1 = np.argmax(sound1.chroma_cqt(), axis=0) / 12
+
     features = {'s0': s0,
                 's1': s1,
                 'sf0': sf0,
                 'sf1': sf1,
                 'cf0': cf0,
                 'cf1': cf1,
+                'chroma_s0': chroma_s0,
+                'chroma_s1': chroma_s1,
                 }
 
+    # Set up a chart to plot sync process
+    fig = plt.figure(figsize=(20, 6))
+    ax = fig.add_subplot(1, 1, 1)
+
     offset_ms = calc_offset(features,
-                            debug=True,
+                            ax=ax,
                             **PARAMS)
 
     # Plot the output
@@ -181,12 +192,14 @@ def main(args):
     return ret
 
 
-def calc_offset(features, debug=False, q=0.9, decay=0.8, num_res=20, bandwidth=3, base_score=0):
+def calc_offset(features, ax=None, q=0.8, decay=0.8, chroma_weight=1.0, sf_weight=1.0, cf_weight=1.0):
 
     sf0 = features['sf0']
     cf0 = features['cf0']
     sf1 = features['sf1']
     cf1 = features['cf1']
+    chroma_s0 = features['chroma_s0']
+    chroma_s1 = features['chroma_s1']
 
     try:
         prom_sf0 = calc_prominence_threshold(sf0, q)
@@ -204,10 +217,6 @@ def calc_offset(features, debug=False, q=0.9, decay=0.8, num_res=20, bandwidth=3
         map_cf0 = map_peaks(peaks_cf0, len(cf0), decay)
         map_cf1 = map_peaks(peaks_cf1, len(cf1), decay)
 
-        # Set up a chart to plot sync process
-        if debug:
-            plt.figure(figsize=(20, 6))
-
         # Acutally calc the offset
         offsets = []
         lookahead_ms = 100
@@ -216,79 +225,86 @@ def calc_offset(features, debug=False, q=0.9, decay=0.8, num_res=20, bandwidth=3
         window_length = int(10 / HOP_LENGTH_SECONDS)
         window_step = int(window_length / 5)
 
-        results = []
-        all_peaks = []
-
         potential_offsets = np.arange(int(ms_to_frames(-lookahead_ms, SAMPLE_RATE)),
                                       int(ms_to_frames(lookbehind_ms, SAMPLE_RATE)))
 
         # Add 1 here as frame offset is 1/4 of the fft window and we want to be in middle on average
         times = frames_to_ms(potential_offsets + 1, SAMPLE_RATE)
 
-        # Measure error of different offsets
-        for start in range(0, len(map_sf0)-1000, 200):
-            try:
-                errors = calc_errors(map_sf0[start:start+window_length],
-                                     map_sf1[start:start+1000],
-                                     potential_offsets)
-                peaks, prominences, heights = calc_peaks(-errors)
+        num_segments = 5
+        # Calculate errors
+        seg_len = len(chroma_s0) // num_segments
+        all_chroma_errors = []
+        all_sf_errors = []
+        all_cf_errors = []
 
-                if len(peaks):
-                    results.append({'peaks': peaks,
-                                    'heights': -heights,
-                                    'prominence': max(prominences),
-                                    'errors': errors})
-            except ValueError:
-                pass
+        for i in range(num_segments):
+            start = i*seg_len
+            end = (i+1)*seg_len
 
-            try:
-                errors = calc_errors(map_cf0[start:start+window_length],
-                                     map_cf1[start:start+1000],
-                                     potential_offsets)
-                peaks, prominences, heights = calc_peaks(-errors)
+            chroma_errors = calc_errors(chroma_s0[start:end],
+                                        chroma_s1[start:end],
+                                        potential_offsets,
+                                        exact=True)
+            std = np.std(chroma_errors)
+            std = 1 if std == 0 else std
+            chroma_errors = (chroma_errors - np.mean(chroma_errors)) / std
+            chroma_errors *= chroma_weight
+            all_chroma_errors.append(chroma_errors)
 
-                if len(peaks):
-                    results.append({'peaks': peaks,
-                                    'heights': -heights,
-                                    'prominence': max(prominences),
-                                    'errors': errors})
-            except ValueError:
-                pass
+            sf_errors = calc_errors(sf0[start:end],
+                                    sf1[start:end],
+                                    potential_offsets)
+            std = np.std(sf_errors)
+            std = 1 if std == 0 else std
+            sf_errors = (sf_errors - np.mean(sf_errors)) / std
+            sf_errors *= sf_weight
+            all_sf_errors.append(sf_errors)
 
-        results.sort(key=lambda x: x['prominence'])
+            cf_errors = calc_errors(cf0[start:end],
+                                    cf1[start:end],
+                                    potential_offsets)
+            std = np.std(cf_errors)
+            std = 1 if std == 0 else std
+            cf_errors = (cf_errors - np.mean(cf_errors)) / std
+            cf_errors *= cf_weight
+            all_cf_errors.append(cf_errors)
 
-        if debug:
-            for result in results[:-num_res]:
-                plt.plot(times, result['errors'], alpha=0.1)
+        # Normalise
+        all_chroma_errors = np.stack(all_chroma_errors)
+        kf = KalmanFilter(initial_state_mean=0, n_dim_obs=5)
+        median_chroma_errors = kf.smooth(all_chroma_errors.transpose())[0].flatten()
 
-        for result in results[-num_res:]:
-            if debug:
-                plt.plot(times, result['errors'])
-            peaks = tuple(zip(result['peaks'], result['heights']))
-            all_peaks.extend(peaks)
+        all_sf_errors = np.stack(all_sf_errors)
+        kf = KalmanFilter(initial_state_mean=0, n_dim_obs=5)
+        median_sf_errors = kf.smooth(all_sf_errors.transpose())[0].flatten()
 
-        if len(all_peaks) > 0:
-            all_peaks = np.array(all_peaks)
-            clustering = MeanShift(bandwidth=bandwidth).fit(np.array(all_peaks[:,0]).reshape(-1, 1))
-            labels = clustering.labels_.flatten()
-            scores = defaultdict(lambda: 0)
-            for i, (peak, height) in enumerate(all_peaks):
-                label = labels[i]
-                scores[label] += base_score + height
+        all_cf_errors = np.stack(all_cf_errors)
+        kf = KalmanFilter(initial_state_mean=0, n_dim_obs=5)
+        median_cf_errors = kf.smooth(all_cf_errors.transpose())[0].flatten()
+        
+        total = np.sum(np.stack([median_sf_errors, median_cf_errors, median_chroma_errors]), axis=0)
 
-            scores = list(scores.items())
-            scores = sorted(scores, key=lambda x: x[1], reverse=True)
-
-            biggest_cluster = scores[0][0]
-            offset_ms = times[int(clustering.cluster_centers_[biggest_cluster])]
+        best_offset = np.argmin(total)
+        offset_ms = times[best_offset]
             
-            # Plot the cluster centres
-            if debug:
-                for i, centre in enumerate(clustering.cluster_centers_):
-                    color = 'r' if i == biggest_cluster else 'grey'
-                    plt.axvline(x=times[int(centre)], color=color, linestyle='--')
-        else:
-            offset_ms = 0
+        if ax:
+            for chroma_errors in all_chroma_errors:
+                ax.plot(times, chroma_errors, color='r', alpha=0.1)
+            ax.plot(times, median_chroma_errors, label='Chroma', color='r')
+
+            for sf_errors in all_sf_errors:
+                ax.plot(times, sf_errors, color='g', alpha=0.1)
+            ax.plot(times, median_sf_errors, label='Spectral Flux', color='g')
+
+            for cf_errors in all_cf_errors:
+                ax.plot(times, cf_errors, color='b', alpha=0.1)
+            ax.plot(times, median_cf_errors, label='Crest Factor', color='b')
+
+            plt.plot(times, total, label='Overall', color='k', linewidth=5)
+
+            ax.axvline(x=offset_ms, color='r', linestyle='--')
+            ax.legend()
                 
     except Exception as e:
         raise
@@ -339,8 +355,11 @@ def map_peaks(peaks, length, decay=0.8):
     return data
 
 
-def calc_errors(x0, x1, offsets):
-    errors = np.array([measure_error(x0, x1, int(-offset)) for offset in offsets])
+def calc_errors(x0, x1, offsets, exact=False):
+    if exact:
+        errors = np.array([measure_error_exact(x0, x1, int(-offset)) for offset in offsets])
+    else:
+        errors = np.array([measure_error(x0, x1, int(-offset)) for offset in offsets])
     return errors
 
 
@@ -351,4 +370,13 @@ def measure_error(x0, x1, offset):
     # calculate the mean squared error of the two signals
     diff = x0[:max_len] - np.roll(x1[:max_len], offset)
     err = np.sum(diff**2) / len(diff)
+    return err
+
+# function to measure two waveforms with one offset by a certian amount
+def measure_error_exact(x0, x1, offset):
+    max_len = min(len(x0), len(x1))
+
+    # calculate the mean squared error of the two signals
+    diff = np.where(x0[:max_len] == np.roll(x1[:max_len], offset), 0, 1)
+    err = np.sum(diff) / len(diff)
     return err

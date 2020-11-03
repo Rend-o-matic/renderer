@@ -27,7 +27,7 @@ from choirless_lib import create_cos_client, mqtt_status
 SAMPLE_RATE = 44100
 HOP_LENGTH_SECONDS = 0.01
 
-PARAMS = {'q': 0.93, 'decay': 0.5, 'chroma_weight': 1.0, 'sf_weight': 0.8, 'cf_weight': 0.9}
+PARAMS = {'cf_weight': 0.4, 'chroma_weight': 0.9, 'decay': 0.65, 'q': 0.9, 'sf_weight': 0.7}
 
 @mqtt_status()
 def main(args):
@@ -285,8 +285,14 @@ def calc_offset(features, ax=None, q=0.8, decay=0.8, chroma_weight=1.0, sf_weigh
         
         total = np.sum(np.stack([median_sf_errors, median_cf_errors, median_chroma_errors]), axis=0)
 
-        best_offset = np.argmin(total)
-        offset_ms = times[best_offset]
+        peaks, _ = find_peaks(-total, height=1.0)
+
+        if len(peaks) > 0:
+            offsets = times[peaks]
+            offset_ms = offsets[0]
+        else:
+            offsets = []
+            offset_ms = 0
             
         if ax:
             for chroma_errors in all_chroma_errors:
@@ -303,7 +309,9 @@ def calc_offset(features, ax=None, q=0.8, decay=0.8, chroma_weight=1.0, sf_weigh
 
             plt.plot(times, total, label='Overall', color='k', linewidth=5)
 
-            ax.axvline(x=offset_ms, color='r', linestyle='--')
+            for offset in offsets:
+                alpha = 1 if offset == offset_ms else 0.2
+                ax.axvline(x=offset, color='r', alpha=alpha, linestyle='--')
             ax.legend()
                 
     except Exception as e:

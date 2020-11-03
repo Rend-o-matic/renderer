@@ -8,6 +8,10 @@ from itertools import permutations
 from functools import partial
 import json
 
+import matplotlib
+matplotlib.use('Agg')
+import matplotlib.pyplot as plt
+
 from calculate_alignment import calc_offset, SAMPLE_RATE, PARAMS as EXISTING_PARAMS
 
 cache_dir = "/Users/matt/Downloads/choirless_videos"
@@ -37,11 +41,14 @@ def main():
             sound0 = Waveform(signal=s, sample_rate=sr)
             sf = sound0.spectral_flux()[0]
             cf = sound0.crest_factor()[0]
+            chroma = np.argmax(sound0.chroma_cqt(), axis=0) / 12
 
             features = {'s': s,
                         'sf': sf,
                         'cf': cf,
+                        'chroma': chroma,
                         'offset': int(offset),
+                        'filename': str(filename.name),
             }
         
             data[f'{choir_id}+{song_id}'].append(features)
@@ -62,7 +69,7 @@ def main():
     study.enqueue_trial(EXISTING_PARAMS)
 
     study.optimize(ob,
-                   n_trials=100,
+                   n_trials=50,
                    n_jobs=1)
 
     print(study.best_params)
@@ -71,39 +78,61 @@ def main():
 
                 
 def objective(valid_combos, debug, trial):
-    bandwidth = trial.suggest_int('bandwidth', 1, 5)
-    q = trial.suggest_discrete_uniform('q', 0.5, 1.0, 0.05)
+    q = trial.suggest_discrete_uniform('q', 0.8, 1.0, 0.01)
     decay = trial.suggest_discrete_uniform('decay', 0.5, 1.0, 0.05)
-    num_res = trial.suggest_int('num_res', 1, 86, 5)
-    base_score= trial.suggest_discrete_uniform('base_score', 0.0, 1.0, 0.05)
-
+    chroma_weight = trial.suggest_discrete_uniform('chroma_weight', 0.0, 1.0, 0.1)
+    sf_weight = trial.suggest_discrete_uniform('sf_weight', 0.0, 1.0, 0.1)
+    cf_weight = trial.suggest_discrete_uniform('cf_weight', 0.0, 1.0, 0.1)
+    
     num_synced = 0
+    num_combos = len(valid_combos)
+
+    if debug:
+        fig = plt.figure(figsize=(10, 6*num_combos))
+    
     for i, (a, b, actual_offset) in enumerate(valid_combos):
         features = {'sf0': a['sf'],
                     'cf0': a['cf'],
+                    'chroma_s0': a['chroma'],
                     'sf1': b['sf'],
                     'cf1': b['cf'],
+                    'chroma_s1': b['chroma'],
                     }
+
+        if debug:
+            ax = fig.add_subplot(num_combos, 1, i+1)
+            ax.set_title(b['filename'])
+        else:
+            ax = None
+            
         offset = calc_offset(features,
-                             debug=False,
+                             ax=ax,
                              q=q,
                              decay=decay,
-                             num_res=num_res,
-                             bandwidth=bandwidth,
-                             base_score=base_score
+                             chroma_weight=chroma_weight,
+                             sf_weight=sf_weight,
+                             cf_weight=cf_weight
         )
 
         diff = abs(actual_offset - offset)
         if debug:
-            print(a['offset'], b['offset'], actual_offset, offset, diff)
+            print(b['filename'], int(actual_offset), int(offset), int(diff))
+        if ax:
+            ax.axvline(x=int(actual_offset), color='g', linestyle='--')
 
         if diff <= 50:
             num_synced += 1
+        else:
+            if ax:
+                ax.set_facecolor('#ffeeee')
 
         if not debug:
             if num_synced == len(valid_combos):
                 trial.study.stop()
 
+    if debug:
+        fig.savefig('tune_sync.png', bbox_inches='tight')
+                
     return num_synced
         
     

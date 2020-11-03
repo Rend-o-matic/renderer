@@ -1,0 +1,76 @@
+{
+  "choir_id": "001kJBOy2Zb6dD3MICmn47iV3A1pGi9e",
+  "song_id": "001kTQzL23cJPl1NuoAa3YwOsC41RQSW",
+  "output": {
+    "size": [
+      1920,
+      1080
+    ],
+    "reverb": 0.1,
+    "reverb_type": "hall",
+    "panning": true,
+    "watermark": "choirless_watermark.png"
+  },
+  "inputs": [
+    {
+      "part_id": "001kTt8Y0Vav3z1ldJoz3PoRKM3cVJo2",
+      "size": [
+        640,
+        480
+      ],
+      "volume": 1,
+      "panning": 0,
+      "offset": 127.70975056689343,
+      "position": [
+        315,
+        55
+      ],
+      "pan": -0.33854166666666663
+    },
+    {
+      "part_id": "001kU92f2s1D1R3FvezS1UKPn400FyD4",
+      "size": [
+        640,
+        480
+      ],
+      "volume": 1,
+      "panning": 0,
+      "offset": 45,
+      "position": [
+        965,
+        55
+      ],
+      "pan": 0.33854166666666674
+    },
+    {
+      "part_id": "001kTSPv3JLnXX1AXCj81achWh3PZX68",
+      "size": [
+        640,
+        480
+      ],
+      "volume": 1,
+      "panning": 0,
+      "offset": 110,
+      "position": [
+        315,
+        545
+      ],
+      "pan": -0.33854166666666663
+    },
+    {
+      "part_id": "001kTR8j0Qi7WN33KgRT489usK34WAuG",
+      "size": [
+        640,
+        480
+      ],
+      "volume": 1,
+      "panning": 0,
+      "offset": 0,
+      "position": [
+        965,
+        545
+      ],
+      "pan": 0.33854166666666674
+    }
+  ]
+}

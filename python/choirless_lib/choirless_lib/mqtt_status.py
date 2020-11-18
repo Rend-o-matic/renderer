@@ -82,6 +82,7 @@ def mqtt_status(helper=None):
                 )
 
             except Exception as e:
+                t2 = time.time()
                 msg['event'] = 'error'
                 msg['error'] = str(e)       
                 msg['end'] = int(t2)

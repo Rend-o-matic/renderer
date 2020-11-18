@@ -4,7 +4,7 @@ from surfboard.sound import Waveform
 import optuna
 from pathlib import Path
 from collections import defaultdict
-from itertools import permutations
+from itertools import permutations, product
 from functools import partial
 import json
 
@@ -38,15 +38,9 @@ def main():
                                  mono=True,
                                  offset=0,
                                  duration=180)
-            sound0 = Waveform(signal=s, sample_rate=sr)
-            sf = sound0.spectral_flux()[0]
-            cf = sound0.crest_factor()[0]
-            chroma = np.argmax(sound0.chroma_cqt(), axis=0) / 12
 
             features = {'s': s,
-                        'sf': sf,
-                        'cf': cf,
-                        'chroma': chroma,
+                        'sr': sr,
                         'offset': int(offset),
                         'filename': str(filename.name),
             }
@@ -59,9 +53,14 @@ def main():
             if a['offset'] == 0:
                 valid_combos.append([a, b, b['offset']])
 
-
-    print("Total number of tests: ", len(valid_combos))
-    ob = partial(objective, valid_combos, False)
+    starts = [0]
+    lengths = [30, 60, 120, 180]
+                
+    print("Number of parts:", len(valid_combos))
+    print("Starts:", starts)
+    print("Lengths:", lengths)
+    print("Total number of tests: ", len(valid_combos)*len(starts)*len(lengths))
+    ob = partial(objective, valid_combos, starts, lengths, False)
 
     study = optuna.load_study(study_name='distributed-example', storage='sqlite:///example.db')
 
@@ -69,66 +68,61 @@ def main():
     study.enqueue_trial(EXISTING_PARAMS)
 
     study.optimize(ob,
-                   n_trials=50,
+                   n_trials=100,
                    n_jobs=1)
 
     print(study.best_params)
 
-    objective(valid_combos, True, study.best_trial)
+    objective(valid_combos, starts, lengths, True, study.best_trial)
 
                 
-def objective(valid_combos, debug, trial):
-    q = trial.suggest_discrete_uniform('q', 0.8, 1.0, 0.01)
-    decay = trial.suggest_discrete_uniform('decay', 0.5, 1.0, 0.05)
+def objective(valid_combos, starts, lengths, debug, trial):
     chroma_weight = trial.suggest_discrete_uniform('chroma_weight', 0.0, 1.0, 0.1)
     sf_weight = trial.suggest_discrete_uniform('sf_weight', 0.0, 1.0, 0.1)
     cf_weight = trial.suggest_discrete_uniform('cf_weight', 0.0, 1.0, 0.1)
     
     num_synced = 0
-    num_combos = len(valid_combos)
+    num_parts = len(valid_combos)
+    num_starts = len(starts) * len(lengths)
+    total_tests = num_parts * num_starts
 
     if debug:
-        fig = plt.figure(figsize=(10, 6*num_combos))
+        fig = plt.figure(figsize=(8*num_starts, 4*num_parts))
     
     for i, (a, b, actual_offset) in enumerate(valid_combos):
-        features = {'sf0': a['sf'],
-                    'cf0': a['cf'],
-                    'chroma_s0': a['chroma'],
-                    'sf1': b['sf'],
-                    'cf1': b['cf'],
-                    'chroma_s1': b['chroma'],
-                    }
 
-        if debug:
-            ax = fig.add_subplot(num_combos, 1, i+1)
-            ax.set_title(b['filename'])
-        else:
-            ax = None
-            
-        offset = calc_offset(features,
-                             ax=ax,
-                             q=q,
-                             decay=decay,
-                             chroma_weight=chroma_weight,
-                             sf_weight=sf_weight,
-                             cf_weight=cf_weight
-        )
+        for j, (start, length) in enumerate(product(starts, lengths)):
 
-        diff = abs(actual_offset - offset)
-        if debug:
-            print(b['filename'], int(actual_offset), int(offset), int(diff))
-        if ax:
-            ax.axvline(x=int(actual_offset), color='g', linestyle='--')
+            if debug:
+                ax = fig.add_subplot(num_parts, num_starts, (i * num_starts) + j + 1)
+                ax.set_title(b['filename'])
+            else:
+                ax = None
 
-        if diff <= 50:
-            num_synced += 1
-        else:
+            offset = calc_offset(a['s'], a['sr'], b['s'], b['sr'],
+                                 ax=ax,
+                                 start_seconds=start,
+                                 length_seconds=length,
+                                 chroma_weight=chroma_weight,
+                                 sf_weight=sf_weight,
+                                 cf_weight=cf_weight,
+            )
+
+            diff = abs(actual_offset - offset)
+            if debug:
+                print(b['filename'], int(actual_offset), int(offset), int(diff))
             if ax:
-                ax.set_facecolor('#ffeeee')
+                ax.axvline(x=int(actual_offset), color='g', linestyle='--')
 
-        if not debug:
-            if num_synced == len(valid_combos):
-                trial.study.stop()
+            if diff <= 50:
+                num_synced += 1
+            else:
+                if ax:
+                    ax.set_facecolor('#ffeeee')
+
+            if not debug:
+                if num_synced == total_tests:
+                    trial.study.stop()
 
     if debug:
         fig.savefig('tune_sync.png', bbox_inches='tight')

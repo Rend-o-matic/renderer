@@ -184,7 +184,7 @@ renderer_final_seq:
 
 # post-produce the final video, then update the status
 post_production_seq:
-	ibmcloud fn action update choirless/post_production_seq --sequence choirless/renderer_final,choirless/renderer_status
+	ibmcloud fn action update choirless/post_production_seq --sequence choirless/post_production,choirless/renderer_status
 
 triggers: bucket_raw_upload_trigger bucket_converted_upload_trigger \
 	  bucket_definition_upload_trigger \

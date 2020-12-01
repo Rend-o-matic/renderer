@@ -45,11 +45,19 @@ def main(args):
 
     # Calc hash of found parts to make sure we have all, if not abort
     if calc_hash_of_keys(row_keys) != rows_hash:
-        ret = {'status': 'missing rows'}
+        # add choir_id/song_id/status for render status updates
+        # if we arrive here, not all parts are rendered yet, so status = 'rendered'
+        ret = {'status': 'missing rows', 'choir_id': choir_id, 'song_id': song_id, 'status': 'rendered'}
         return ret
 
     args['row_keys'] = row_keys
-    return process(args)
+    r = process(args)
+    # render status data
+    # if we arrive here, all parts are rendered, so status = 'composited'
+    r['choir_id'] = choir_id
+    r['song_id'] = song_id
+    r['status'] = 'composited'
+    return r
 
 @mqtt_status()
 def process(args):

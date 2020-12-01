@@ -203,7 +203,10 @@ def main(args):
         ret = {'dst_key': output_key,
                'def_id': def_id,
                'render_time': int(t2-t1),
-               'status': 'ok'}
+               'status': 'ok',
+               'choir_id': choir_id,
+               'song_id': song_id,
+               'status': 'done'}
 
         return ret
 

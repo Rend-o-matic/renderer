@@ -12,6 +12,7 @@ def main(args):
 
     notification = args.get('notification', {})
     key = notification.get('object_name', args['key'])
+    choir_id, song_id, part_id = Path(key).stem.split('.')[0].split('+')
     bucket = args.get('bucket', notification.get('bucket_name', args['preview_bucket']))
     dst_bucket = args.get('dst_bucket', args['snapshots_bucket'])
 
@@ -53,6 +54,10 @@ def main(args):
     stdout, stderr = out.run()
 
     ret = {"status": "ok",
-           "snapshot_key": output_key}
+           "snapshot_key": output_key,
+           "choir_id": choir_id,
+           "song_id": song_id,
+           "part_id": part_id,
+           "status": "new"}
 
     return ret

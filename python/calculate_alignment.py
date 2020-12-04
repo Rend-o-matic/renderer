@@ -363,19 +363,26 @@ def calc_offset(s0, sr0, s1, sr1,
                 all_cf_errors.append(cf_errors)
 
         # Normalise
-        all_chroma_errors = np.stack(all_chroma_errors)
-        kf = KalmanFilter(initial_state_mean=0, n_dim_obs=all_chroma_errors.shape[0])
-        median_chroma_errors = kf.smooth(all_chroma_errors.transpose())[0].flatten()
+        to_stack = []
+        if len(all_chroma_errors):
+            all_chroma_errors = np.stack(all_chroma_errors)
+            kf = KalmanFilter(initial_state_mean=0, n_dim_obs=all_chroma_errors.shape[0])
+            median_chroma_errors = kf.smooth(all_chroma_errors.transpose())[0].flatten()
+            to_stack.append(median_chroma_errors)
 
-        all_sf_errors = np.stack(all_sf_errors)
-        kf = KalmanFilter(initial_state_mean=0, n_dim_obs=all_sf_errors.shape[0])
-        median_sf_errors = kf.smooth(all_sf_errors.transpose())[0].flatten()
+        if len(all_sf_errors):
+            all_sf_errors = np.stack(all_sf_errors)
+            kf = KalmanFilter(initial_state_mean=0, n_dim_obs=all_sf_errors.shape[0])
+            median_sf_errors = kf.smooth(all_sf_errors.transpose())[0].flatten()
+            to_stack.append(median_sf_errors)
 
-        all_cf_errors = np.stack(all_cf_errors)
-        kf = KalmanFilter(initial_state_mean=0, n_dim_obs=all_cf_errors.shape[0])
-        median_cf_errors = kf.smooth(all_cf_errors.transpose())[0].flatten()
+        if len(all_cf_errors):
+            all_cf_errors = np.stack(all_cf_errors)
+            kf = KalmanFilter(initial_state_mean=0, n_dim_obs=all_cf_errors.shape[0])
+            median_cf_errors = kf.smooth(all_cf_errors.transpose())[0].flatten()
+            to_stack.append(median_cf_errors)
         
-        total = np.sum(np.stack([median_sf_errors, median_cf_errors, median_chroma_errors]), axis=0)
+        total = np.sum(np.stack(to_stack), axis=0)
 
         peaks, _ = calc_peaks(-total, height=1.0, prominence=1.0)
 
@@ -387,17 +394,20 @@ def calc_offset(s0, sr0, s1, sr1,
             offset_ms = 0
             
         if ax:
-            for chroma_errors in all_chroma_errors:
-                ax.plot(times, chroma_errors, color='r', alpha=0.3)
-            ax.plot(times, median_chroma_errors, label='Chroma', color='r')
+            if len(all_chroma_errors):
+                for chroma_errors in all_chroma_errors:
+                    ax.plot(times, chroma_errors, color='r', alpha=0.3)
+                ax.plot(times, median_chroma_errors, label='Chroma', color='r')
 
-            for sf_errors in all_sf_errors:
-                ax.plot(times, sf_errors, color='g', alpha=0.3)
-            ax.plot(times, median_sf_errors, label='Spectral Flux', color='g')
+            if len(all_sf_errors):
+                for sf_errors in all_sf_errors:
+                    ax.plot(times, sf_errors, color='g', alpha=0.3)
+                ax.plot(times, median_sf_errors, label='Spectral Flux', color='g')
 
-            for cf_errors in all_cf_errors:
-                ax.plot(times, cf_errors, color='b', alpha=0.3)
-            ax.plot(times, median_cf_errors, label='Crest Factor', color='b')
+            if len(all_cf_errors):
+                for cf_errors in all_cf_errors:
+                    ax.plot(times, cf_errors, color='b', alpha=0.3)
+                ax.plot(times, median_cf_errors, label='Crest Factor', color='b')
 
             plt.plot(times, total, label='Overall', color='k', linewidth=5)
 

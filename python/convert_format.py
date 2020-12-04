@@ -89,7 +89,7 @@ def main(args):
         mute = False
 
         # Volume detect
-        vol_threshold = int(args.get('vol_threshold', 22))
+        vol_threshold = int(args.get('vol_threshold', 30))
         vol_pct = float(args.get('vol_pct', 0.05))
 
         total_samples = 0

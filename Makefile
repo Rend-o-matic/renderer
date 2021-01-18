@@ -63,6 +63,7 @@ create-buckets:
 	ibmcloud cos create-bucket --bucket $(STATUS_BUCKET_NAME) --ibm-service-instance-id $(COS_INSTANCE_NAME) --region $(COS_REGION)
 	ibmcloud cos create-bucket --bucket $(SNAPSHOTS_BUCKET_NAME) --ibm-service-instance-id $(COS_INSTANCE_NAME) --region $(COS_REGION)
 	ibmcloud cos create-bucket --bucket $(MISC_BUCKET_NAME) --ibm-service-instance-id $(COS_INSTANCE_NAME) --region $(COS_REGION)
+	ibmcloud cos create-bucket --bucket $(DEBUG_BUCKET_NAME) --ibm-service-instance-id $(COS_INSTANCE_NAME) --region $(COS_REGION)
 
 # Create and set namespace
 namespace:

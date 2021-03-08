@@ -13,25 +13,25 @@ The `main` function expects an object with the following attributes:
 
 - `choirId` - the id choir whose song is to be rendered. (required)
 - `songId` - the id of the song to render. (required)
-- `CHOIRLESS_API_URL` - the URL Choirless API (required).
+- `CHOIRLESS_API_URL` - the URL of the Choirless API (required).
 - `CHOIRLESS_API_KEY` - the API key for the Choirless API (required).
-- `COS_ENDPOINT` - COS endpoint (required)
-- `COS_API_KEY` - COS API Key (required)
-- `COS_INSTANCE_ID` - COS service instance id (required)
-- `COS_BUCKET` - the name of the COS bucket to write the output definition to (required)
+- `COS_ENDPOINT` - Cloud Object Storage endpoint (required).
+- `COS_API_KEY` - COS API Key (required).
+- `COS_INSTANCE_ID` - COS service instance id (required).
+- `COS_BUCKET` - the name of the COS bucket to write the output definition to (required).
 
 optional parameters:
 
-- `width` - the number of horizontal pixels in the output video (default: `1920`)
-- `height` - the number of vertical pixels in the output video (default: `1080`)
-- `reverb` - the amount of reverb to add 0 = none, 1 = lots (default: `0.1`)
-- `reverbType` - the type of reverb to add: `none`, `smallroom`, `largeroom`, `hall`, `church`  (default `hall`)
-- `panning` - whether to pan audio according to video's horizonal position (default:  `true`)
-- `watermark` - filename of watermark image (default: `null`)
-- `center` - whether to centre the videos (default: `true`)
-- `margin` - the number of pixels margin between videos (default: `10`)
+- `width` - the number of horizontal pixels in the output video (default: `1920`).
+- `height` - the number of vertical pixels in the output video (default: `1080`).
+- `reverb` - the amount of reverb to add 0 = none, 1 = lots (default: `0.1`).
+- `reverbType` - the type of reverb to add: `none`, `smallroom`, `largeroom`, `hall`, `church`  (default `hall`).
+- `panning` - whether to pan audio according to video's horizonal position (default:  `true`).
+- `watermark` - filename of watermark image (default: `null`).
+- `center` - whether to centre the videos (default: `true`).
+- `margin` - the number of pixels margin between videos (default: `10`).
 
-> Note: items in capitals are usually embedded in the serverless function "package"
+> Note: items in capitals are usually embedded in the serverless function "package" containing the action.
 
 ## Example usage
 
@@ -100,7 +100,7 @@ const go = async () => {
 }
 ```
 
-## Building Docker image
+## Building the Docker image
 
 ```sh
 # create a docker image, based on the standard OpenWhisk image but with our 
@@ -145,5 +145,7 @@ ibmcloud fn package update choirless -P config.json
 ibmcloud fn action update choirless/renderer --docker glynnbird/choirless_renderer:1.0.3 index.js
 
 # test invocation for known choirId/songId
-ibmcloud fn action invoke choirless/renderer --result --param choirId "001jZ8zh3NPbQ71ZmcEx3BDvTX1n3mgO" --param songId "001jZ9O31N91NT0bEukk49qjL62D9vWT"
+ibmcloud fn action invoke choirless/renderer --result \
+--param choirId "001jZ8zh3NPbQ71ZmcEx3BDvTX1n3mgO" \
+--param songId "001jZ9O31N91NT0bEukk49qjL62D9vWT"
 ```

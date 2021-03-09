@@ -22,4 +22,4 @@ The following actions can be found in this repository:
 
 ## Docker
 
-The actions use libraries which are not available by default in the IBM Cloud Functions service. As such, Docker is used to build images based on the IBM Cloud Functions runtime base images, but adding additional libraries needed by our code. Full instructions in each module's README.
+The actions use libraries which are not available by default in the IBM Cloud Functions service. As such, Docker is used to build custom images based on the IBM Cloud Functions runtime base images, but with additional libraries needed by our code. Full instructions in each module's README.

@@ -23,7 +23,7 @@
   },
   "homepage": "https://github.com/Choirless/renderer#readme",
   "dependencies": {
-    "axios": "^0.19.2",
+    "axios": "^0.21.1",
     "boxjam": "0.0.21",
     "ibm-cos-sdk": "^1.6.1"
   },

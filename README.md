@@ -1,5 +1,7 @@
 # Rend-o-matic renderer
 
+[![License](https://img.shields.io/badge/License-MIT-blue.svg)](https://opensource.org/licenses/MIT) [![Slack](https://img.shields.io/badge/Join-Slack-blue)](https://callforcode.org/slack)
+
 This repository holds the [IBM Cloud Functions](https://cloud.ibm.com/functions) serverless actions that allow a choir's video contributions to be resized, correct for latency offsets, and finally combined into a video wall.
 
 Some actions are built in Python, the rest in Node.js.
@@ -18,7 +20,6 @@ The following actions can be found in this repository:
 - `calculate_alignment` - compares two audio streams using [librosa](https://github.com/librosa/librosa) to calculate the latency between them.
 - `trim_clip` - time-shifts a video by a supplied offset to bring it align with the others.
 - `pass_to_sticher` - development function to call the `stitcher` action.
-
 
 ## Docker
 

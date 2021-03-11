@@ -1,6 +1,6 @@
-# Choirless renderer
+# Rend-o-matic renderer
 
-This repository holds the [IBM Cloud Functions](https://cloud.ibm.com/functions) serverless actions that allow a choir's video contributions to be resized, correct for latency offsets and finally combined into a video wall.
+This repository holds the [IBM Cloud Functions](https://cloud.ibm.com/functions) serverless actions that allow a choir's video contributions to be resized, correct for latency offsets, and finally combined into a video wall.
 
 Some actions are built in Python, the rest in Node.js.
 
@@ -14,7 +14,7 @@ The following actions can be found in this repository:
 
 ### Python
 
-- `convert_format` - uses [ffmpeg](https://ffmpeg.org/) to convert user-generated videos in `.webm` format into `.mp4` format for further processing.
+- `convert_format` - uses [FFmpeg](https://ffmpeg.org/) to convert user-generated videos in `.webm` format into `.mp4` format for further processing.
 - `calculate_alignment` - compares two audio streams using [librosa](https://github.com/librosa/librosa) to calculate the latency between them.
 - `trim_clip` - time-shifts a video by a supplied offset to bring it align with the others.
 - `pass_to_sticher` - development function to call the `stitcher` action.
